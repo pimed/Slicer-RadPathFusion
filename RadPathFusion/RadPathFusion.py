@@ -39,6 +39,7 @@ class RadPathFusionWidget:
       self.setup()
       self.parent.show()
     self.logic = None
+    self.slicerElastixPath = None
 
   def setup(self):
     # Collapsible button
@@ -111,6 +112,8 @@ class RadPathFusionWidget:
     #FIXME: make logic globab
     self.logic = RadPathFusionLogic()
     #self.logic.testElastixLogic()
+    self.slicerElastixPath = "/home/mrusu/.config/NA-MIC/Extensions-27350/SlicerElastix/lib/Slicer-4.9/Resources"
+    self.logic.SetSlicerElastixPath(self.slicerElastixPath)
 
     self.logic.run(self.inputFixedSelector.currentNode(), 
         self.inputMovingSelector.currentNode(),
@@ -134,16 +137,34 @@ class RadPathFusionWidget:
 #
 class RadPathFusionLogic():
     def __init__(self):
-        self.TBD = None
+        import os
+        self.slicerElastixPath = None
+        self.scriptPath = os.path.dirname(os.path.abspath(__file__))
+        self.registrationParameterFilesDir = os.path.abspath(os.path.join(self.scriptPath, 
+            'Resources', 
+            'RegistrationParameters'))
 
     def run(self, fixedVolume, movingVolume, outputVolumeNode = None):
         import sys
-        sys.path.append(' /home/mrusu/.config/NA-MIC/Extensions-26899/SlicerElastix/lib/Slicer-4.9/qt-scripted-modules/Resources/')
-        from Elastix import ElastixLogic
+        if self.slicerElastixPath:
+            sys.path.append(self.slicerElastixPath)
+        else:
+            print("Please set the path to Elastics")
+            return 0
+
+        try:
+            from Elastix import ElastixLogic
+        except Exception as e:
+            print("Coudn't load ElastixLogic from ", self.SetSlicerElastixPath)
+            print(e)
+            return 0
        
         logic = ElastixLogic()
-        parameterFilenames = ["Similarity2.txt", "Similarity.txt"]
-        print(parameterFilenames)
+        parameterFilenames = ["QuickCenteringRigid.txt", 
+            "Similarity.txt", 
+            "Affine.txt", 
+            "Deformable.txt"]
+        logic.registrationParameterFilesDir =  self.registrationParameterFilesDir
         logic.registerVolumes(fixedVolume, movingVolume, 
             parameterFilenames = parameterFilenames, 
             outputVolumeNode = outputVolumeNode)
@@ -169,16 +190,31 @@ class RadPathFusionLogic():
         outputVolume.CreateDefaultDisplayNodes()
 
         import sys
-        sys.path.append('/home/mrusu/.config/NA-MIC/Extensions-26899/SlicerElastix/lib/Slicer-4.9/qt-scripted-modules/Resources/')
-        from Elastix import ElastixLogic, RegistrationPresets_ParameterFilenames
+        if self.slicerElastixPath:
+            sys.path.append(self.slicerElastixPath)
+        else:
+            print("Please set the path to Elastics")
+            return 0
+
+        try:
+            from Elastix import ElastixLogic, RegistrationPresets_ParameterFilenames
+        except Exception as e:
+            print("Coudn't load ElastixLogic from ", self.SetSlicerElastixPath)
+            print(e)
+            return 0
 
 
         logic = ElastixLogic()
-        parameterFilenames = logic.getRegistrationPresets()[0][RegistrationPresets_ParameterFilenames]
-        print(parameterFilenames)
-        logic.registerVolumes(tumor1, tumor2, parameterFilenames = parameterFilenames, outputVolumeNode = outputVolume)
+        parameterFilenames = logic.getRegistrationPresets()[0][
+            RegistrationPresets_ParameterFilenames]
+        logic.registerVolumes(tumor1, 
+            tumor2, 
+            parameterFilenames = parameterFilenames, 
+            outputVolumeNode = outputVolume)
 
         selectionNode = slicer.app.applicationLogic().GetSelectionNode()
         selectionNode.SetReferenceActiveVolumeID(outputVolume.GetID())
         slicer.app.applicationLogic().PropagateVolumeSelection(0)
 
+    def SetSlicerElastixPath(self, path):
+        self.slicerElastixPath = path
