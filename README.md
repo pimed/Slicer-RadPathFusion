@@ -7,7 +7,6 @@ Contains the Slicer Extension for radiology pathology fusion
 
 * Download [3D Slicer](https://download.slicer.org/)
 * Download [Elastix 4.9.0](https://github.com/SuperElastix/elastix/releases/tag/4.9.0).
-* Clone    [SlicerElastix](https://github.com/lassoan/SlicerElastix)
 * Clone    Slicer-RadPathFusion (this repository) 
 
 ## How to install 
@@ -26,7 +25,5 @@ Contains the Slicer Extension for radiology pathology fusion
 # To do
 
 1. Multi-threaded
-2. Progress bar
-3. Dynamic instead of Hardcoded path
-
+1. Dynamic instead of Hardcoded path for elastix
  
