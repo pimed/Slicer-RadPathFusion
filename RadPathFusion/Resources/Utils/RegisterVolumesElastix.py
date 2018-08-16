@@ -168,7 +168,7 @@ class RegisterVolumesElastix():
             #print("Enviroment: ", repr(self.getElastixEnv())) 
         if subprocess.mswindows:
           return subprocess.Popen([executableFilePath] + cmdLineArguments, 
-                env=self.getElastixEnv(),
+                #env=self.getElastixEnv(),
                 stdout=subprocess.PIPE, 
                 universal_newlines=True, 
                 startupinfo=self.getStartupInfo())
@@ -186,7 +186,7 @@ class RegisterVolumesElastix():
         if subprocess.mswindows:
             return subprocess.Popen([os.path.join(self.getElastixBinDir(),
                 self.transformixFilename)] + cmdLineArguments, 
-                env=self.getElastixEnv(),
+                #env=self.getElastixEnv(),
                 stdout=subprocess.PIPE, 
                 universal_newlines = True, 
                 startupinfo=self.getStartupInfo())
@@ -246,16 +246,16 @@ class RegisterVolumesElastix():
 
         import platform
         if platform.system() != 'Windows':
-          elastixLibDir = os.path.abspath(os.path.join(elastixBinDir, '../lib'))
+            elastixLibDir = os.path.abspath(os.path.join(elastixBinDir, '../lib'))
 
-        #if elastixEnv.get("LD_LIBRARY_PATH"):
-        #    elastixEnv["LD_LIBRARY_PATH"] = elastixLibDir + os.pathsep + \
-        #        elastixEnv["LD_LIBRARY_PATH"]  
-        #else:
-        #    elastixEnv["LD_LIBRARY_PATH"] = elastixLibDir
-        #FIXME: somehow the enviroment of slicer was messing up the elastix run
-        #This might end up messing the slicer behavior, but hopefully not
-        elastixEnv["LD_LIBRARY_PATH"] = elastixLibDir
+            #if elastixEnv.get("LD_LIBRARY_PATH"):
+            #    elastixEnv["LD_LIBRARY_PATH"] = elastixLibDir + os.pathsep + \
+            #        elastixEnv["LD_LIBRARY_PATH"]  
+            #else:
+            #    elastixEnv["LD_LIBRARY_PATH"] = elastixLibDir
+            #FIXME: somehow the enviroment of slicer was messing up the elastix run
+            #This might end up messing the slicer behavior, but hopefully not
+            elastixEnv["LD_LIBRARY_PATH"] = elastixLibDir
 
         return elastixEnv
     def getTempDirectoryBase(self, bySlicer=True):
