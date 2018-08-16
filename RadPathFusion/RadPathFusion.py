@@ -1,3 +1,5 @@
+from __future__ import print_function
+import os
 from time import sleep
 
 from __main__ import vtk, qt, ctk, slicer
@@ -6,22 +8,22 @@ from __main__ import vtk, qt, ctk, slicer
 #
 
 class RadPathFusion:
-  def __init__(self, parent):
-    parent.title = "Radiology-Pathology Fusion"
-    parent.categories = ["Radiology-Pathology Fusion"]
-    parent.dependencies = []
-    parent.contributors = ["Mirabela Rusu (Stanford)"]
-    parent.helpText = \
-        """
-        This modules provides a basic interface for radiology pathology fusion
-        <br /><br />
-        For detailed information about a specific model please consult the <a href=\"http://pimed.stanford.edu/\">piMed website</a>.
-         """
+    def __init__(self, parent):
+        parent.title = "Radiology-Pathology Fusion"
+        parent.categories = ["Radiology-Pathology Fusion"]
+        parent.dependencies = []
+        parent.contributors = ["Mirabela Rusu (Stanford)"]
+        parent.helpText = \
+            """
+            This modules provides a basic interface for radiology pathology fusion
+            <br /><br />
+            For detailed information about a specific model please consult the <a href=\"http://pimed.stanford.edu/\">piMed website</a>.
+             """
 
-    parent.acknowledgementText = """
-    The developers would like to thank the support of the PiMed and Stanford University.
-    """
-    self.parent = parent
+        parent.acknowledgementText = """
+        The developers would like to thank the support of the PiMed and Stanford University.
+        """
+        self.parent = parent
 
 #
 # qRadPathFusionWidget
@@ -66,6 +68,8 @@ class RadPathFusionWidget:
         if platform.system() == 'Windows':
             self.elastixPath.setCurrentPath("C:/Programs/elastix-4.9.0-win64/")
 
+        """
+
         self.slicerElastixPath = ctk.ctkPathLineEdit()
         self.slicerElastixPath.filters = ctk.ctkPathLineEdit.Dirs
         self.configFormLayout.addRow("Slicer Elastix Path:", self.slicerElastixPath)
@@ -74,7 +78,7 @@ class RadPathFusionWidget:
             self.slicerElastixPath.setCurrentPath('/home/mrusu/Programs/SlicerElastix/Elastix')
         if platform.system() == 'Windows':
             self.slicerElastixPath.setCurrentPath("C:/Programs/SlicerElastix/Elastix/")
-
+        """
      
         #
         # Input 
@@ -232,7 +236,7 @@ class RadPathFusionWidget:
         if self.verbose:
             print('onApply')
 
-        self.logic.SetSlicerElastixPath(self.slicerElastixPath.currentPath)
+        #self.logic.SetSlicerElastixPath(self.slicerElastixPath.currentPath)
         self.logic.SetElastixPath(self.elastixPath.currentPath)
 
         self.logic.run(self.fixedVolumeSelector.currentNode(), 
@@ -245,12 +249,14 @@ class RadPathFusionWidget:
     def onCancel(self):
         if self.verbose:
             print('onCancel')
+        self.logic.abort = True
+        self.onLogicEventAbort()
 
     def onTest(self):
         if self.verbose:
             print('onTest')
 
-        self.logic.SetSlicerElastixPath(self.slicerElastixPath.currentPath)
+        #self.logic.SetSlicerElastixPath(self.slicerElastixPath.currentPath)
         self.logic.SetElastixPath(self.elastixPath.currentPath)
 
         self.logic.testElastixLogic()
@@ -278,15 +284,59 @@ class RadPathFusionWidget:
 #
 class RadPathFusionLogic():
     def __init__(self):
-        import os
         self.slicerElastixPath = None
         self.elastixPath = None
+        self.registrationLogic = None
+    
         self.scriptPath = os.path.dirname(os.path.abspath(__file__))
         self.registrationParameterFilesDir = os.path.abspath(os.path.join(self.scriptPath, 
             'Resources', 
             'RegistrationParameters'))
+        self.useLocalRegisterVolumes = True
 
         self.verbose = True
+
+        self.abort = None
+
+    def setLogic(self):
+        if self.verbose:
+            print("ElastixPath:",self.elastixPath)
+
+        if not self.useLocalRegisterVolumes:
+            if self.verbose:
+                print("SlicerElastixPath:",self.slicerElastixPath)
+
+            import sys
+            if self.slicerElastixPath:
+                sys.path.append(self.slicerElastixPath)
+                print("Path:", sys.path)
+            else:
+                print("Please set the path to Elastics")
+                return 0
+
+            if self.verbose:
+                print("path append was succesful", self.slicerElastixPath)
+
+            try:
+                from Elastix import ElastixLogic
+            except Exception as e:
+                print("Coudn't load ElastixLogic from ", self.SetSlicerElastixPath)
+                print(e)
+                return 0
+           
+            self.registrationLogic = ElastixLogic()
+            self.registrationLogic.registrationParameterFilesDir = self.registrationParameterFilesDir
+            self.registrationLogic.setCustomElastixBinDir(self.elastixPath)
+
+        else:
+            import sys
+            sys.path.append(os.path.join(self.scriptPath,"Resources","Utils"))
+    
+            import RegisterVolumesElastix as rve
+            self.registrationLogic = rve.RegisterVolumesElastix()
+            self.registrationLogic.setElastixBinDir(self.elastixPath)
+            self.registrationLogic.setRegistrationParameterFilesDir (self.registrationParameterFilesDir)
+    
 
     def run(self, fixedVolume, movingVolume, 
         outputVolumeNode     = None,
@@ -303,41 +353,42 @@ class RadPathFusionLogic():
         if widgetPresent:
             self.cmdStartEvent()
     
-        if self.verbose:
-            print("SlicerElastixPath:",self.slicerElastixPath)
-            print("ElastixPath:",self.elastixPath)
-    
-        import sys
-        if self.slicerElastixPath:
-            sys.path.append(self.slicerElastixPath)
-        else:
-            print("Please set the path to Elastics")
-            return 0
+   
+        
+        self.setLogic()
 
-        if self.verbose:
-            print("path append was succesful", self.slicerElastixPath)
-
-        try:
-            from Elastix import ElastixLogic
-        except Exception as e:
-            print("Coudn't load ElastixLogic from ", self.SetSlicerElastixPath)
-            print(e)
-            return 0
-       
-        logic = ElastixLogic()
         parameterFilenames = ["QuickCenteringRigid.txt", 
-            "Similarity.txt"]#, 
-            #"Affine.txt", 
-            #"Deformable.txt"]
-        logic.registrationParameterFilesDir =  self.registrationParameterFilesDir
-        logic.setCustomElastixBinDir(self.elastixPath)
+            "Similarity.txt", 
+            "Affine.txt", 
+            "Deformable.txt"]
 
-        logic.registerVolumes(fixedVolume, movingVolume, 
+        output = self.registrationLogic.getInputParameters(fixedVolume, movingVolume, 
             parameterFilenames   = parameterFilenames, 
             outputVolumeNode     = outputVolumeNode,
             outputTransformNode  = outputTransformNode,
             fixedVolumeMaskNode  = fixedVolumeMaskNode,
             movingVolumeMaskNode = movingVolumeMaskNode)
+
+        inputParamsElastix, inputParamsTransformix, tmpDir, resultResampleDir = output
+
+        # Run registration
+        ep = self.registrationLogic.startElastix(inputParamsElastix)
+        self.logProcessOutput(ep, len(parameterFilenames)+1, 0, widgetPresent)
+
+        tp = self.registrationLogic.startTransformix(inputParamsTransformix)
+        self.logProcessOutput(tp, len(parameterFilenames)+1, len(parameterFilenames), 
+            widgetPresent)
+ 
+        if outputVolumeNode:
+            outputVolumePath = os.path.join(resultResampleDir, "result.mhd")
+            self.registrationLogic.loadResultVolume(outputVolumePath, outputVolumeNode)
+
+        if outputTransformNode:
+            outputTransformPath = os.path.join(resultResampleDir, "deformationField.mhd")
+            self.registrationLogic.loadResultTransform(outputTransformPath, 
+                outputTransformNode)
+
+        self.registrationLogic.cleanUpTempFiles(tmpDir)
 
         if widgetPresent:
             self.cmdEndEvent()
@@ -359,25 +410,11 @@ class RadPathFusionLogic():
         slicer.mrmlScene.AddNode(outputVolume)
         outputVolume.CreateDefaultDisplayNodes()
 
-        import sys
-        if self.slicerElastixPath:
-            sys.path.append(self.slicerElastixPath)
-        else:
-            print("Please set the path to Elastics")
-            return 0
+        #self.useLocalRegisterVolumes = False
+        self.setLogic()
 
-        try:
-            from Elastix import ElastixLogic, RegistrationPresets_ParameterFilenames
-        except Exception as e:
-            print("Coudn't load ElastixLogic from ", self.SetSlicerElastixPath)
-            print(e)
-            return 0
-
-
-        logic = ElastixLogic()
-        parameterFilenames = logic.getRegistrationPresets()[0][
-            RegistrationPresets_ParameterFilenames]
-        logic.registerVolumes(tumor1, 
+        parameterFilenames = ["QuickCenteringRigid.txt"]
+        self.registrationLogic.registerVolumes(tumor1, 
             tumor2, 
             parameterFilenames = parameterFilenames, 
             outputVolumeNode = outputVolume)
@@ -423,5 +460,39 @@ class RadPathFusionLogic():
             widget = slicer.modules.RadPathFusionWidget
             widget.onLogicEventEnd()
         self.yieldPythonGIL()
+
+    def logProcessOutput(self, process, totalSteps, startStep, widgetPresent):
+        stepSize = 1.0/totalSteps
+        progress = startStep*stepSize
+        output_log = ""      
+        # print('executing')
+        while True:
+            slicer.app.processEvents()
+            self.cmdCheckAbort(process)
+            line = process.stdout.readline()
+            if not line:
+                    break
+            output_log += line.rstrip()+"\n"
+            runningWithNewFile1 = line[:35] == "Running elastix with parameter file"
+            runningWithNewFile2  = not line[len(line)-14:]=="has finished.\n"
+            if runningWithNewFile1 and runningWithNewFile2:
+                progress += stepSize
+                #print(line)
+                #print("\'",line[:35],"\'"," --- \'",line[len(line)-14:],"\'")
+            
+            if widgetPresent:
+                self.cmdProgressEvent(progress)
+            #print(line[:35],end="")
+
+        process.stdout.close()
+        return_code = process.wait()
+        if return_code:
+            if self.abort:
+                raise ValueError("User requested cancel.")
+            else:
+                print(output_log)
+                print('Return code:', return_code)
+                import subprocess
+                raise subprocess.CalledProcessError(return_code, "elastix")
 
 
