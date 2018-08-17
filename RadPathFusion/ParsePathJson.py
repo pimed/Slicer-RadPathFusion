@@ -59,7 +59,7 @@ class ParsePathJsonWidget:
         self.inputJsonFn = ctk.ctkPathLineEdit()
         self.inputFormLayout.addRow("Input Json:", self.inputJsonFn)
         #self.inputJsonFn.setCurrentPath('input.json')
-        self.inputJsonFn.setCurrentPath('/home/mrusu/Projects/RadPathFusion/prostate/4_histology/1_1627377.json')
+        self.inputJsonFn.setCurrentPath('/home/mrusu/Projects/RadPathFusion/prostate/4_histology/3_1613543.json')
         #self.inputJsonFn.setMaximumWidth(425)
  
 
@@ -75,7 +75,7 @@ class ParsePathJsonWidget:
 
         self.outputJsonFn = ctk.ctkPathLineEdit()
         self.outputFormLayout.addRow("Output Json:", self.outputJsonFn)
-        self.outputJsonFn.setCurrentPath('/home/mrusu/Projects/RadPathFusion/prostate/4_histology/1_1627377_test.json')
+        self.outputJsonFn.setCurrentPath('/home/mrusu/Projects/RadPathFusion/prostate/4_histology/3_1613543_test.json')
         #self.outputJsonFn.setMaximumWidth(400)
      
 
@@ -92,7 +92,7 @@ class ParsePathJsonWidget:
         self.outputVolumeSelector.showHidden = False
         self.outputVolumeSelector.showChildNodeTypes = False
         self.outputVolumeSelector.setMRMLScene( slicer.mrmlScene )
-        self.outputFormLayout.addRow("Output volume: ", self.outputVolumeSelector)
+        self.outputFormLayout.addRow("Output Volume: ", self.outputVolumeSelector)
         #self.outputVolumeSelector.setMaximumWidth(400)
 
         #
@@ -211,6 +211,7 @@ class ParsePathJsonWidget:
 
         print("Selected Mask", self.idxMask)
 
+
 #
 # parsePath json fusion logic
 #
@@ -232,6 +233,10 @@ class ParsePathJsonLogic():
             self.logic = ppju.ParsePathJsonUtils()
             self.logic.setPath(json_path)
             self.logic.initComponents()
+
+        if not str(self.logic.path)==str(json_path):
+            self.logic.setPath(json_path)
+            self.logic.initComponents()            
 
         if outputVolumeNode:
             import sitkUtils
@@ -258,6 +263,10 @@ class ParsePathJsonLogic():
             self.logic = ppju.ParsePathJsonUtils()
             self.logic.setPath(json_path)
             self.logic.initComponents()
+
+        if not str(self.logic.path)==str(json_path):
+            self.logic.setPath(json_path)
+            self.logic.initComponents()            
 
 
         if idxMask>=0 and outputMaskVolumeNode:

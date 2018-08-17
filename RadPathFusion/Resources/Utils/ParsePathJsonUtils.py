@@ -71,7 +71,7 @@ class PathologyVolume():
             ps = PathologySlice()
             ps.rgbImageFn = data[key]['filename']
             ps.maskDict   = data[key]['regions']
-            ps.doFlip     = data[key]['flip'], 
+            ps.doFlip     = int(data[key]['flip']) 
             ps.doRotate   = data[key].get('rotate',None)
             ps.loadImageSize()
             size = ps.rgbImageSize
@@ -238,7 +238,22 @@ class PathologySlice():
 
 
         if self.verbose:
-            print("Reading {:d} from \'{}\'".format(self.refSliceIdx, self.rgbImageFn) )
+            print("Reading {:d} ({:d},{}) from \'{}\'".format(self.refSliceIdx, 
+                self.doFlip, 
+                self.doRotate,
+                self.rgbImageFn) )
+
+        #FIXME: use simple ITK (for some reason sitk.Flip and ::-1 didn't work)
+        if (not self.doFlip==None) and self.doFlip==1:
+            arr = sitk.GetArrayFromImage(rgbImage)
+            arr = arr[:,arr.shape[1]:0:-1,:]
+            rgbImage2 = sitk.GetImageFromArray(arr, isVector = True)
+            rgbImage2.SetSpacing(rgbImage.GetSpacing()) 
+            rgbImage2.SetOrigin(rgbImage.GetDirection()) 
+            rgbImage2.SetDirection(rgbImage.GetDirection()) 
+            rgbImage = rgbImage2 
+            
+
 
         if self.storeImage:
             # the volume was converted in the other unit above, but just note store info
@@ -286,18 +301,19 @@ class PathologySlice():
             select = sitk.VectorIndexSelectionCastImageFilter()
             im  = select.Execute(im, 0, sitk.sitkUInt8) 
            
-
+        #FIXME: use simple ITK (for some reason sitk.Flip and ::-1 didn't work)
+        if (not self.doFlip==None) and self.doFlip==1:
+            arr = sitk.GetArrayFromImage(im)
+            arr = arr[:,arr.shape[1]:0:-1]
+            im2 = sitk.GetImageFromArray(arr)
+            im2.SetSpacing(im.GetSpacing()) 
+            im2.SetOrigin(im.GetDirection()) 
+            im2.SetDirection(im.GetDirection()) 
+            im =im2
+ 
         if self.verbose:
             print("Reading {:d} from \'{}\'".format(self.refSliceIdx, maskFn))
 
-        """
-        if self.storeImage:
-            # the volume was converted in the other unit above, but just note store info
-            self.rgbImage = rgbImage
-            return self.rgbImage
-        else:
-            return rgbImage
-        """
         return im
 
     def setReference(self, vol): 
@@ -310,7 +326,7 @@ class PathologySlice():
         # when setting a new reference, the Transform needs to be recomputed
         self.transform = None
 
-    def computeCenterTransform(self, im, ref, mode = 0):
+    def computeCenterTransform(self, im, ref, mode = 0, doRotate=None):
         # 
         #Input
         #----
@@ -330,20 +346,46 @@ class PathologySlice():
         tr = sitk.CenteredTransformInitializer(ref0, im0, 
             sitk.AffineTransform(im.GetDimension()), 
             sitk.CenteredTransformInitializerFilter.GEOMETRY)
+        
+        self.transform = sitk.AffineTransform(tr)
 
-        self.transform = tr
-    
+        if doRotate:
+            center = ref0.TransformContinuousIndexToPhysicalPoint(
+                np.array(ref0.GetSize())/2.0)
+            rotation = sitk.AffineTransform(im0.GetDimension())
+            rotation.Rotate(0,1,np.radians(doRotate))
+            rotation.SetCenter(center)
+
+            composite = sitk.Transform(im.GetDimension(), sitk.sitkComposite)
+            composite.AddTransform(self.transform)
+            composite.AddTransform(rotation)
+            self.transform = composite
+
+    def getFlipped(self, im):
+        flipped_im = sitk.Flip(im, (False, True))
+
+        return flipped_im 
 
     def setTransformedRgb(self, ref):
         im = self.loadRgbImage()
-    
+
+        #nothing was read
+        if not im:
+            return ref
+
+
         if not self.transform:
-            self.computeCenterTransform(im, ref, 0)
+            self.computeCenterTransform(im, ref, 0, self.doRotate)
             
-        im_tr  = sitk.Resample(im, ref[:,:,self.refSliceIdx], self.transform)
-        ref_tr = sitk.JoinSeries(im_tr)
-        ref    = sitk.Paste(ref, ref_tr, ref_tr.GetSize(), 
-            destinationIndex=[0,0,self.refSliceIdx])
+        try:    
+            im_tr  = sitk.Resample(im, ref[:,:,self.refSliceIdx], self.transform)
+            ref_tr = sitk.JoinSeries(im_tr)
+            ref    = sitk.Paste(ref, ref_tr, ref_tr.GetSize(), 
+                destinationIndex=[0,0,self.refSliceIdx])    
+        except Exception as e:
+            print(e)
+            print(im_tr, ref_tr, ref)
+
 
         return ref 
 
@@ -353,10 +395,10 @@ class PathologySlice():
         #nothing was read
         if not im:
             return ref
-    
+
         if not self.transform:
-            self.computeCenterTransform(im, ref, 1)
-        
+            self.computeCenterTransform(im, ref, 1, self.doRotate)
+       
         try:    
             im_tr  = sitk.Resample(im, ref[:,:,self.refSliceIdx], 
                     self.transform, 
