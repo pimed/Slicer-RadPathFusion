@@ -9,7 +9,7 @@ from __main__ import vtk, qt, ctk, slicer
 
 class RadPathFusion:
     def __init__(self, parent):
-        parent.title = "Radiology-Pathology Fusion"
+        parent.title = "3. Radiology-Pathology Fusion"
         parent.categories = ["Radiology-Pathology Fusion"]
         parent.dependencies = []
         parent.contributors = ["Mirabela Rusu (Stanford)"]
@@ -68,17 +68,6 @@ class RadPathFusionWidget:
         if platform.system() == 'Windows':
             self.elastixPath.setCurrentPath("C:/Programs/elastix-4.9.0-win64/")
 
-        """
-
-        self.slicerElastixPath = ctk.ctkPathLineEdit()
-        self.slicerElastixPath.filters = ctk.ctkPathLineEdit.Dirs
-        self.configFormLayout.addRow("Slicer Elastix Path:", self.slicerElastixPath)
-
-        if platform.system() == 'Linux':
-            self.slicerElastixPath.setCurrentPath('/home/mrusu/Programs/SlicerElastix/Elastix')
-        if platform.system() == 'Windows':
-            self.slicerElastixPath.setCurrentPath("C:/Programs/SlicerElastix/Elastix/")
-        """
      
         #
         # Input 
@@ -474,7 +463,7 @@ class RadPathFusionLogic():
                     break
             output_log += line.rstrip()+"\n"
             runningWithNewFile1 = line[:35] == "Running elastix with parameter file"
-            runningWithNewFile2  = not line[len(line)-14:]=="has finished.\n"
+            runningWithNewFile2 = line[len(line)-14:]=="has finished.\n"
             if runningWithNewFile1 and runningWithNewFile2:
                 progress += stepSize
                 #print(line)

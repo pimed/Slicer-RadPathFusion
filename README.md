@@ -24,6 +24,12 @@ Contains the Slicer Extension for radiology pathology fusion
 
 # To do
 
-1. Multi-threaded
-1. Dynamic instead of Hardcoded path for elastix
- 
+1. Parse Json
+* add progress bar at loading
+* add ability to actually load and edit loaded json (not only the volumes and masks)
+* add ability to create new Json files or json entry
+1. Reconstruction 
+* Add functionality for reconstruction
+1. RadPathFusion
+*. Multi-threaded
+*. Dynamic instead of Hardcoded path for elastix
