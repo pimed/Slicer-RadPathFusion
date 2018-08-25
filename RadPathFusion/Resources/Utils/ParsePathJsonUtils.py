@@ -47,6 +47,7 @@ class PathologyVolume():
         self.inPlaneScaling = 1.2
          
         self.pathologySlices = None
+        self.jsonDict     = None
     
 
     def initComponents(self):
@@ -61,6 +62,7 @@ class PathologyVolume():
             print("Loading from", self.path)
         
         data = json.load(open(self.path))
+        self.jsonDict = data
 
         pix_size_x = 1
         pix_size_y = 1
@@ -68,7 +70,8 @@ class PathologyVolume():
         self.pathologySlices = []
 
         for key in np.sort(list(data)):
-            ps = PathologySlice()
+            ps            = PathologySlice()
+            ps.jsonKey    = key
             ps.rgbImageFn = data[key]['filename']
             ps.maskDict   = data[key]['regions']
             ps.doFlip     = int(data[key]['flip']) 
@@ -171,7 +174,91 @@ class PathologyVolume():
             vol = ps.setTransformedMask(vol, idxMask)
 
         return vol
+        
+    def getInfo4UI(self):
+        data = []
+        
+        for idx, ps in enumerate(self.pathologySlices):
+            masks = []
+            for mask_key in list(ps.maskDict):
+                fn = ps.maskDict[mask_key]['filename']
+                try:
+                    readIdxMask = int(mask_key[6:])
+                except:
+                    readIdxMask = 1
+                masks.append([readIdxMask, fn])
+                
+            el = [idx,
+                ps.refSliceIdx+1, #start count from 1 in the UI
+                ps.rgbImageFn, 
+                masks, 
+                ps.doFlip, 
+                ps.doRotate]
+            data.append(el)
+        
+        return data
+        
+    def updateSlice(self, idx, param, value):
+        if len(self.pathologySlices)> idx:
+            #the transorm needs to be updated
+            self.pathologySlices[idx].transform  = None 
+            jsonKey = False
+            if param  == 'slice_number':
+                oldKey = 'slice'+str(idx)
+                newKey = 'slice'+str(int(value))
+                print("Changing", oldKey, newKey)
+                self.jsonDict[newKey] = self.jsonDict[self.pathologySlices[idx].jsonKey]
+                self.pathologySlices[idx].jsonKey = newKey
+                if not oldKey == newKey:
+                    del self.jsonDict[oldKey]
+                
+                self.pathologySlices[idx].refSliceIdx = value 
+                jsonKey = True
+                jsonValue = value+1
+                
+            if param  == 'filename':
+                self.pathologySlices[idx].rgbImageFn = value
+                jsonKey = True           
+                jsonValue = str(value)
+                
+            if param  == 'flip':
+                self.pathologySlices[idx].doFlip = value
+                jsonKey = True   
+                jsonValue = value
+                
+            if param  == 'rotate':
+                self.pathologySlices[idx].doRotate = value
+                jsonKey = True        
+                jsonValue = value
+                
+            if not jsonKey:
+                print("Adding new key", param)
+                
+            self.jsonDict[self.pathologySlices[idx].jsonKey][param] = jsonValue
+            
+    def updateSliceMask(self, idxSlice, idxMask, param, value):
+        if len(self.pathologySlices)> idxSlice:
+            #the transorm needs to be updated
+            
+            jsonKey = False
+            if param  == 'key':
+                oldKey = 'region'+str(idxMask)
+                newKey = 'region'+str(int(value))
+                self.pathologySlices[idxSlice].maskDict[newKey] = self.pathologySlices[idxSlice].maskDict[oldKey]
+                del self.pathologySlices[idxSlice].maskDict[oldKey]
+                
+            if param  == 'filename':
+                self.pathologySlices[idxSlice].maskDict['region'+str(idxMask)]['filename'] = value
+                    
 
+    def saveJson(self, path_out_json):
+        if self.verbose: 
+            print("Saving Json File")
+        
+        with open(path_out_json, 'w') as outfile:
+            json.dump(self.jsonDict, outfile, indent=4, sort_keys=True)
+
+            
 
 class PathologySlice():
 
@@ -199,6 +286,7 @@ class PathologySlice():
         self.unitMode   = 0 #microns; 1-milimeters
 
         self.verbose    = True
+        
 
     def loadImageSize(self):
         #Attention: This doesn't actually load the image, just reads the header information
@@ -280,7 +368,7 @@ class PathologySlice():
                 readIdxMask = 1
 
             if self.verbose:
-                print(idxMask, readIdxMask, fn)
+                print("Mask:", idxMask, readIdxMask, fn)
 
             if readIdxMask == idxMask:
                 maskFn = fn
@@ -372,6 +460,8 @@ class PathologySlice():
         #nothing was read
         if not im:
             return ref
+            
+        print("Set Transformed image", self.doRotate)
 
 
         if not self.transform:
