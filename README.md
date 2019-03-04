@@ -31,5 +31,33 @@ Contains the Slicer Extension for radiology pathology fusion
 1. Reconstruction 
 * Add functionality for reconstruction
 1. RadPathFusion
-*. Multi-threaded
-*. Dynamic instead of Hardcoded path for elastix
+* Multi-threaded
+* Dynamic instead of Hardcoded path for elastix
+
+# Create RGB volume from the Histology Slices (using json)
+
+In order to create a 3D RGB histology volume from the histology slices one needs to have already a json file [https://github.com/pimed/parse_data/blob/master/parse_digital_scans/parse_svs.py](https://github.com/pimed/parse_data/blob/master/parse_digital_scans/parse_svs.py). The path to tiff files within the json need to point to existing files. The ParsePathology module will allow one to load the stack of images and correct the rotation, flipping and order in the json file. 
+
+1. Open Parse Pathology module: "ModuleMenu> RAdiology-Pathology Fusion > Parse Pathology"
+
+Arguments:
+1. Input json: select path to json file
+1. Output volume: create a volume to see the 3D volume in slices
+1. Output Mask: create a mask to show as mask
+1. Mask ID: different regions have different id, so update as needed
+
+Actions
+1. Load Json: loads the json and shows it content
+1. Load the volume: uses the entered information to create a volume 
+1. Load Mask: as as Load volume
+
+
+# IMPORTANT Tips on how to work around issues
+
+1. Manually number the slices from 1.. and on word before loading volume
+1. change the mask numbering: All same region in the stack should have the same index
+  * WARNING
+  * if there are 2 regions, eg. 0 and 1, that need to be changed, don't just write 1 instead of 0. That will internally delete the json information.
+  * if 0 and 1 need to be swapped: type 2 instead of 1, type 1 instead of 0, type 0 instead of 2 
+1. Close and reopen slicer to open a new json
+
