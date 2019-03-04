@@ -56,8 +56,8 @@ Actions
 
 1. Manually number the slices from 1.. and on word before loading volume
 1. change the mask numbering: All same region in the stack should have the same index
-  * WARNING
-  * if there are 2 regions, eg. 0 and 1, that need to be changed, don't just write 1 instead of 0. That will internally delete the json information.
-  * if 0 and 1 need to be swapped: type 2 instead of 1, type 1 instead of 0, type 0 instead of 2 
+    * WARNING
+    * if there are 2 regions, eg. 0 and 1, that need to be changed, don't just write 1 instead of 0. That will internally delete the json information.
+    * if 0 and 1 need to be swapped: type 2 instead of 1, type 1 instead of 0, type 0 instead of 2 
 1. Close and reopen slicer to open a new json
 
