@@ -74,8 +74,14 @@ class PathologyVolume():
             ps.jsonKey    = key
             ps.rgbImageFn = data[key]['filename']
             ps.maskDict   = data[key]['regions']
-            ps.doFlip     = int(data[key]['flip']) 
-            ps.doRotate   = data[key].get('rotate',None)
+            try: # new format
+                ps.transformDict = data[key]['transform']
+                ps.doFlip     = ps.transformDict['flip']
+                ps.doRotate   = ps.transformDict['rotation_angle']
+            except: #old format
+                ps.doFlip     = int(data[key]['flip']) 
+                ps.doRotate   = data[key].get('rotate',None)
+                
             ps.loadImageSize()
             size = ps.rgbImageSize
 
@@ -95,10 +101,23 @@ class PathologyVolume():
             if self.no_regions < len(list(data[key]['regions'])):            
                 self.no_regions = len(list(data[key]['regions']))
 
-            if self.pix_size_x > float(data[key]['resolution_x']):
-                self.pix_size_x = float(data[key]['resolution_x'])
-            if self.pix_size_y > float(data[key]['resolution_y']):
-                self.pix_size_y = float(data[key]['resolution_y'])
+            xml_res_x = None
+            try: #new xml format
+                xml_res_x = float(data[key]['resolution_x_um'])
+            except: #old xml format
+                xml_res_x = float(data[key]['resolution_x'])
+                
+            xml_res_y = None                
+            try: #new xml format
+                xml_res_y = float(data[key]['resolution_y_um'])
+            except: #old xml format
+                xml_res_y = float(data[key]['resolution_y'])
+
+                
+            if self.pix_size_x > xml_res_x:
+                self.pix_size_x = xml_res_x
+            if self.pix_size_y > xml_res_y:
+                self.pix_size_y = xml_res_y
 
 
         self.noSlices = len(list(data))
@@ -204,6 +223,7 @@ class PathologyVolume():
             self.pathologySlices[idx].transform  = None 
             jsonKey = False
             if param  == 'slice_number':
+                """
                 oldKey = 'slice'+str(idx)
                 newKey = 'slice'+str(int(value))
                 print("Changing", oldKey, newKey)
@@ -211,6 +231,7 @@ class PathologyVolume():
                 self.pathologySlices[idx].jsonKey = newKey
                 if not oldKey == newKey:
                     del self.jsonDict[oldKey]
+                """
                 
                 self.pathologySlices[idx].refSliceIdx = value 
                 jsonKey = True
@@ -234,7 +255,12 @@ class PathologyVolume():
             if not jsonKey:
                 print("Adding new key", param)
                 
-            self.jsonDict[self.pathologySlices[idx].jsonKey][param] = jsonValue
+            if param  == 'flip' or param  == 'rotate':
+                if not self.jsonDict[self.pathologySlices[idx].jsonKey]['transform']:
+                    self.jsonDict[self.pathologySlices[idx].jsonKey]['transform']={}
+                self.jsonDict[self.pathologySlices[idx].jsonKey]['transform'][param] = jsonValue
+            else:
+                self.jsonDict[self.pathologySlices[idx].jsonKey][param] = jsonValue
             
     def updateSliceMask(self, idxSlice, idxMask, param, value):
         if len(self.pathologySlices)> idxSlice:
@@ -468,7 +494,8 @@ class PathologySlice():
             self.computeCenterTransform(im, ref, 0, self.doRotate)
             
         try:    
-            im_tr  = sitk.Resample(im, ref[:,:,self.refSliceIdx], self.transform)
+            im_tr  = sitk.Resample(im, ref[:,:,self.refSliceIdx], self.transform,
+                sitk.sitkNearestNeighbor, 255)
             ref_tr = sitk.JoinSeries(im_tr)
             ref    = sitk.Paste(ref, ref_tr, ref_tr.GetSize(), 
                 destinationIndex=[0,0,self.refSliceIdx])    

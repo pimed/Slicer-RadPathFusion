@@ -208,6 +208,8 @@ class ParsePathJsonWidget:
         self.saveJsonButton.enabled = True
         self.advancedCollapsibleButton.enabled = True
         self.populate_advanced_tab();
+        self.loadJsonButton.enabled = False
+
         
     def populate_advanced_tab(self):
         jsonUIInfo = self.logic.getJsonInfo4UI(self.inputJsonFn.currentPath)
@@ -220,6 +222,7 @@ class ParsePathJsonWidget:
             self.idxSlide = ctk.ctkDoubleSpinBox()
             self.advancedFormLayout.addRow("Idx:", self.idxSlide)
             self.idxSlide.setValue(int(el[1]))
+            self.idxSlide.setEnabled(False);
             
             self.rgbPath = ctk.ctkPathLineEdit()
             self.advancedFormLayout.addRow("    Rgb Image:", self.rgbPath)
@@ -248,6 +251,7 @@ class ParsePathJsonWidget:
                 self.advancedFormLayout.addRow("        Mask Idx:", 
                     self.idxMask2)
                 self.idxMask2.setValue(int(maskEl[0]))
+                self.idxMask2.setEnabled(False)
                 
                 self.maskPath = ctk.ctkPathLineEdit()
                 self.advancedFormLayout.addRow("        Mask Image:", self.maskPath)
