@@ -98,14 +98,15 @@ class RadPathFusionWidget:
         self.fixedVolumeMaskSelector.nodeTypes = ["vtkMRMLLabelMapVolumeNode"]
         self.fixedVolumeMaskSelector.addEnabled = False
         self.fixedVolumeMaskSelector.removeEnabled = False
-        self.fixedVolumeMaskSelector.noneEnabled = True
+        # Should be enable to allow the registration to run without seg
+        self.fixedVolumeMaskSelector.noneEnabled = False
         self.fixedVolumeMaskSelector.showHidden = False
         self.fixedVolumeMaskSelector.showChildNodeTypes = False
         self.fixedVolumeMaskSelector.setMRMLScene( slicer.mrmlScene )
         self.inputFormLayout.addRow("Fixed volume mask: ", self.fixedVolumeMaskSelector)
 
         self.movingVolumeSelector = slicer.qMRMLNodeComboBox()
-        self.movingVolumeSelector.nodeTypes = ["vtkMRMLScalarVolumeNode"]
+        self.movingVolumeSelector.nodeTypes = ["vtkMRMLScalarVolumeNode", "vtkMRMLVectorVolumeNode"]
         self.movingVolumeSelector.selectNodeUponCreation = True
         self.movingVolumeSelector.addEnabled = False
         self.movingVolumeSelector.removeEnabled = False
@@ -124,7 +125,8 @@ class RadPathFusionWidget:
         self.movingVolumeMaskSelector.selectNodeUponCreation = True
         self.movingVolumeMaskSelector.addEnabled = False
         self.movingVolumeMaskSelector.removeEnabled = False
-        self.movingVolumeMaskSelector.noneEnabled = True
+        # Should be enable to allow the registration to run without seg
+        self.movingVolumeMaskSelector.noneEnabled = False
         self.movingVolumeMaskSelector.showHidden = False
         self.movingVolumeMaskSelector.showChildNodeTypes = False
         self.movingVolumeMaskSelector.setMRMLScene( slicer.mrmlScene )
@@ -357,9 +359,40 @@ class RadPathFusionLogic():
             outputTransformNode  = outputTransformNode,
             fixedVolumeMaskNode  = fixedVolumeMaskNode,
             movingVolumeMaskNode = movingVolumeMaskNode)
+            
+        print(output)
 
         inputParamsElastix, inputParamsTransformix, tmpDir, resultResampleDir = output
 
+        """
+        import sitkUtils
+        #outputVolume = self.logic.pathologyVolume.loadRgbVolume()
+        #sitkUtils.PushVolumeToSlicer(outputVolume, 
+        #    targetNode=outputVolumeNode)
+            
+        sitk_movingVolume = sitkUtils.PullVolumeFromSlicer(movingVolume)
+        print(sitk_movingVolume.GetSize(), sitk_movingVolume.GetNumberOfComponentsPerPixel())
+        
+        if sitk_movingVolume.GetNumberOfComponentsPerPixel()==3: # RGB image-convert to grayscale
+            import SimpleITK as sitk
+            import numpy as np
+            arr = sitk.GetArrayFromImage(sitk_movingVolume)
+            print(arr.shape)
+
+            arr_out = np.zeros((arr.shape[0],arr.shape[1],arr.shape[2]))
+            arr_out = np.mean(arr, axis=3)
+
+            sitk_img = sitk.GetImageFromArray(arr_out)
+            sitk_img.SetSpacing(sitk_movingVolume.GetSpacing())
+            sitk_img.SetOrigin(sitk_movingVolume.GetOrigin())
+            sitk_img.SetDirection(sitk_movingVolume.GetDirection())
+            
+            
+            sitkUtils.PushVolumeToSlicer(sitk_img, targetNode=movingVolume)
+        
+        print(sitk_img.GetSize(), sitk_img.GetNumberOfComponentsPerPixel())
+        """
+        
         # Run registration
         ep = self.registrationLogic.startElastix(inputParamsElastix)
         self.logProcessOutput(ep, len(parameterFilenames)+1, 0, widgetPresent)

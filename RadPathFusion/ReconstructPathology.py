@@ -85,22 +85,22 @@ class ReconstructPathologyWidget:
         # Layout within the input collapsible button
         self.inputFormLayout = qt.QFormLayout(self.inputCollapsibleButton)
 
-        """
         #
-        # fixed volume selector
+        # rgb volume selector
         #
-        self.fixedVolumeSelector = slicer.qMRMLNodeComboBox()
-        self.fixedVolumeSelector.nodeTypes = ["vtkMRMLScalarVolumeNode"]
-        self.fixedVolumeSelector.selectNodeUponCreation = True
-        self.fixedVolumeSelector.addEnabled = False
-        self.fixedVolumeSelector.removeEnabled = False
-        self.fixedVolumeSelector.noneEnabled = False
-        self.fixedVolumeSelector.showHidden = False
-        self.fixedVolumeSelector.showChildNodeTypes = False
-        self.fixedVolumeSelector.setMRMLScene( slicer.mrmlScene )
-        self.inputFormLayout.addRow("Fixed volume: ", self.fixedVolumeSelector)
+        self.inputVolumeSelector = slicer.qMRMLNodeComboBox()
+        self.inputVolumeSelector.nodeTypes = ["vtkMRMLVectorVolumeNode"]
+        self.inputVolumeSelector.selectNodeUponCreation = True
+        self.inputVolumeSelector.addEnabled = False
+        self.inputVolumeSelector.removeEnabled = False
+        self.inputVolumeSelector.noneEnabled = False
+        self.inputVolumeSelector.showHidden = False
+        self.inputVolumeSelector.showChildNodeTypes = False
+        self.inputVolumeSelector.setMRMLScene( slicer.mrmlScene )
+        self.inputFormLayout.addRow("Fixed volume: ", self.inputVolumeSelector)
 
-        
+        ###
+        """
         self.fixedVolumeMaskSelector = slicer.qMRMLNodeComboBox()
         self.fixedVolumeMaskSelector.nodeTypes = ["vtkMRMLLabelMapVolumeNode"]
         self.fixedVolumeMaskSelector.addEnabled = False
@@ -110,7 +110,7 @@ class ReconstructPathologyWidget:
         self.fixedVolumeMaskSelector.showChildNodeTypes = False
         self.fixedVolumeMaskSelector.setMRMLScene( slicer.mrmlScene )
         self.inputFormLayout.addRow("Fixed volume mask: ", self.fixedVolumeMaskSelector)
-
+        
         self.movingVolumeSelector = slicer.qMRMLNodeComboBox()
         self.movingVolumeSelector.nodeTypes = ["vtkMRMLScalarVolumeNode"]
         self.movingVolumeSelector.selectNodeUponCreation = True
@@ -137,7 +137,7 @@ class ReconstructPathologyWidget:
         self.movingVolumeMaskSelector.setMRMLScene( slicer.mrmlScene )
         self.movingVolumeMaskSelector.setToolTip("Moving volume mask")
         self.inputFormLayout.addRow("Moving volume mask: ", self.movingVolumeMaskSelector)
-
+        """
 
         #
         #Output
@@ -164,6 +164,7 @@ class ReconstructPathologyWidget:
         self.outputVolumeSelector.setMRMLScene( slicer.mrmlScene )
         self.outputFormLayout.addRow("Output volume: ", self.outputVolumeSelector)
 
+        """
         #
         # output transform selector
         #
