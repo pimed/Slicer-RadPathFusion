@@ -488,7 +488,7 @@ class ParsePathJsonLogic():
             print("Logic doesn't exit")
             return
             
-        self.logic.pathologyVolume.updateSlice(idx, 'rotate', 
+        self.logic.pathologyVolume.updateSlice(idx, 'rotation_angle', 
             int(newRotate) )
 
     def setMaskIdx(self, idxSlice, idxMask, newIdx):

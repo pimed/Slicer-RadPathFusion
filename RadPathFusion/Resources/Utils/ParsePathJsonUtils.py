@@ -247,7 +247,7 @@ class PathologyVolume():
                 jsonKey = True   
                 jsonValue = value
                 
-            if param  == 'rotate':
+            if param  == 'rotation_angle':
                 self.pathologySlices[idx].doRotate = value
                 jsonKey = True        
                 jsonValue = value
@@ -255,7 +255,7 @@ class PathologyVolume():
             if not jsonKey:
                 print("Adding new key", param)
                 
-            if param  == 'flip' or param  == 'rotate':
+            if param  == 'flip' or param  == 'rotation_angle':
                 if not self.jsonDict[self.pathologySlices[idx].jsonKey]['transform']:
                     self.jsonDict[self.pathologySlices[idx].jsonKey]['transform']={}
                 self.jsonDict[self.pathologySlices[idx].jsonKey]['transform'][param] = jsonValue
