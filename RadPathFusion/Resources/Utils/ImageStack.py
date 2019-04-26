@@ -2,13 +2,15 @@ import os
 import json
 import numpy as np
 import SimpleITK as sitk
+from ImageRegistration import RegisterImages
+
 class PathologyVolume():
 
     def __init__(self, parent=None):
         self.verbose = True
         self.path = None
 
-        self.no_regions = 0
+        self.noRegions = 0
         self.noSlices = 0
         # in micrometers
         self.pix_size_x = 0
@@ -24,9 +26,25 @@ class PathologyVolume():
          
         self.pathologySlices = None
         self.jsonDict     = None
+        
+        #filenames if needed to load here
+        self.imagingContraintFilename = None
+        self.imagingContraintMaskFilename = None
+        
+        #files 
+        self.imagingContraint       = None
+        self.imagingContraintMask   = None
+        
+        self.volumeOrigin       = None
+        self.volumeDirection    = None
+        self.volumeSpacing      = None
+        
     
-
     def initComponents(self):
+        """
+        Reads json and identifies size needed for output volume; 
+        Does NOT Read the actual images; Does NOT Create the volume
+        """
         if self.verbose:
             print("initialize components") 
 
@@ -37,15 +55,19 @@ class PathologyVolume():
         if self.verbose:
             print("Loading from", self.path)
         
-        data = json.load(open(self.path))
+        try:
+            data = json.load(open(self.path))
+        except Exception as e:
+            print(e)
+            return 0
         self.jsonDict = data
 
-        pix_size_x = 1
-        pix_size_y = 1
+        self.pix_size_x = 0
+        self.pix_size_y = 0
 
         self.pathologySlices = []
 
-        for key in np.sort(list(data)):
+        for key in np.sort(list(self.jsonDict)):
             ps            = PathologySlice()
             ps.jsonKey    = key
             ps.rgbImageFn = data[key]['filename']
@@ -74,8 +96,8 @@ class PathologyVolume():
                 ps.refSliceIdx = len(self.pathologySlices)
             self.pathologySlices.append(ps)
             
-            if self.no_regions < len(list(data[key]['regions'])):            
-                self.no_regions = len(list(data[key]['regions']))
+            if self.noRegions < len(list(data[key]['regions'])):            
+                self.noRegions = len(list(data[key]['regions']))
 
             xml_res_x = None
             try: #new xml format
@@ -89,6 +111,10 @@ class PathologyVolume():
             except: #old xml format
                 xml_res_y = float(data[key]['resolution_y'])
 
+            if self.pix_size_x==0 and xml_res_x>0:
+                self.pix_size_x = xml_res_x
+            if self.pix_size_y==0 and xml_res_y>0:
+                self.pix_size_y = xml_res_y
                 
             if self.pix_size_x > xml_res_x:
                 self.pix_size_x = xml_res_x
@@ -105,7 +131,12 @@ class PathologyVolume():
             print("Found {:d} slices @ max size {}".format(self.noSlices,
                 self.maxSliceSize))
             print("Create volume at {}".format(self.volumeSize))
+            
+        return 1
 
+    def printTransform(self, ref=None):
+        for i, ps in enumerate(self.pathologySlices):
+            print(i, ps.transform)
 
     def setPath(self, path):
         self.path=path
@@ -113,8 +144,16 @@ class PathologyVolume():
     def loadRgbVolume(self):      
         # create new volume with white background
         vol = sitk.Image(self.volumeSize, sitk.sitkVectorUInt8, 3)
-
+        if self.volumeOrigin:
+            vol.SetOrigin(self.volumeOrigin)
+        if self.volumeDirection:
+            vol.SetDirection(self.volumeDirection)          
         isSpacingSet = False
+        if self.volumeSpacing:
+            vol.SetSpacing(self.volumeSpacing)
+            isSpacingSet = True
+            
+            
         # fill the volume
         # put ps.im in vol at index ps.idx
         for i, ps in enumerate(self.pathologySlices):
@@ -145,8 +184,15 @@ class PathologyVolume():
     def loadMask(self, idxMask=0):
         # create new volume with 
         vol = sitk.Image(self.volumeSize, sitk.sitkUInt8)
-
+        if self.volumeOrigin:
+            vol.SetOrigin(self.volumeOrigin)
+        if self.volumeDirection:
+            vol.SetDirection(self.volumeDirection)
         isSpacingSet = False
+        if self.volumeSpacing:
+            vol.SetSpacing(self.volumeSpacing)
+            isSpacingSet = True
+            
         # fill the volume
         # put ps.im in vol at index ps.idx
         for i, ps in enumerate(self.pathologySlices):
@@ -260,7 +306,141 @@ class PathologyVolume():
         with open(path_out_json, 'w') as outfile:
             json.dump(self.jsonDict, outfile, indent=4, sort_keys=True)
 
+    def getConstraint(self):
+    
+        # if we have a filename but not volume
+        if not self.imagingContraint and self.imagingContraintFilename:
+            try:
+                self.imagingContraint  = sitk.ReadImage(self.imagingContraintFilename,sitk.sitkFloat32)
+            except Exception as e:
+                print("Failed to read", self.imagingContraintFilename)
+        
+        # if we have a filename but not mask        
+        if not self.imagingContraintMask and self.imagingContraintMaskFilename:
+            try:
+                self.imagingContraintMask = sitk.ReadImage(self.imagingContraintMaskFilename)
+            except Exception as e:
+                print("Failed to read", self.imagingContraintMaskFilename)
+
+        self.imagingContraintMask = sitk.Cast(
+            sitk.Resample(self.imagingContraintMask>0, 
+                self.imagingContraint, 
+                sitk.Transform(), 
+                sitk.sitkNearestNeighbor),
+            sitk.sitkUInt16)            
             
+        ### get bounding box
+        labelStats = sitk.LabelStatisticsImageFilter()
+        labelStats.Execute(self.imagingContraint, self.imagingContraintMask)
+        box     = labelStats.GetBoundingBox(1)
+        
+        ### pad the box
+        pad = 15
+        minX = box[0]-pad
+        if box[0]-pad<0:
+            minX = 0
+        maxX = box[1]+pad
+        if box[1]+pad>self.imagingContraint.GetSize()[0]:
+            maxX = self.imagingContraint.GetSize()[0]
+        minY = box[2]-pad
+        if box[2]-pad<0:
+            minY = 0
+        maxY = box[3]+pad
+        if box[3]+pad>self.imagingContraint.GetSize()[1]:
+            minY = self.imagingContraint.GetSize()[1]         
+        cropImC = self.imagingContraint[minX:maxX,minY:maxY,box[4]:box[5]+1]
+        boxSize = cropImC.GetSize()
+        sp      = self.imagingContraint.GetSpacing()
+        
+
+        ### create image with the same pixel size as the pathology volume, 
+        ### but containting the contraint
+        #convert mm (from constraint) to um from histology
+        roiSize = [int(boxSize[0]*1000*sp[0]/self.pix_size_x),
+            int(boxSize[1]*1000*sp[1]/self.pix_size_y),
+            int(boxSize[2])]
+        roiSp   = [self.pix_size_x/1000.0, self.pix_size_y/1000.0, sp[2]]
+        constraint = sitk.Image(roiSize, sitk.sitkUInt16)      
+        constraint.SetSpacing(roiSp)
+        constraint.SetOrigin(cropImC.GetOrigin())
+        constraint.SetDirection(cropImC.GetDirection())
+
+        ##Resample to the new size
+        imCM = sitk.Cast(
+            sitk.Resample(self.imagingContraintMask, constraint, sitk.Transform(), sitk.sitkNearestNeighbor),
+            sitk.sitkUInt16)
+
+        imC = sitk.Cast(
+            sitk.Resample(self.imagingContraint, constraint, sitk.Transform(), sitk.sitkLinear),
+            sitk.sitkUInt16)
+        
+        #sitk.WriteImage(imC, "moving3d.mha")
+        
+        imC = imC*imCM
+        constraint_range=[i for i in range(imC.GetSize()[2])]
+
+        return imC, constraint_range
+            
+    def registerSlices(self, useImagingConstaint=False):
+        self.store_volume = True
+
+        ### if constraints are set, then use them and output the volume relative 
+        ### to the constraint
+        if useImagingConstaint:
+            if (self.imagingContraintFilename and self.imagingContraintMaskFilename) or (self.imagingContraint and self.imagingContraintMask):
+                imC, constraint_range = self.getConstraint()
+                self.volumeSize         = imC.GetSize()
+                self.volumeOrigin       = imC.GetOrigin()
+                self.volumeDirection    = imC.GetDirection()
+                self.volumeSpacing      = imC.GetSpacing()
+            else:
+                print("Using Imaging Constraints was set, but no filenames were set")
+                print("set magingContraintFilename and imagingContraintMaskFilename")
+                print("No contraints will be used")
+                useImagingConstaint = False
+                return
+                                
+            ref = self.loadRgbVolume()
+            refMask = self.loadMask(0)
+                
+            for imov in range(self.noSlices):
+                if imov >= len(constraint_range):
+                    break
+                ifix = constraint_range[imov]
+                print("----Refine slice to imaging constraint", imov, ifix, "------")
+                movPs = self.pathologySlices[imov]
+                movPs.registerToConstrait(imC[:,:,ifix], ref, refMask)
+
+        else:
+            ref = self.loadRgbVolume()
+        
+            length = len(self.pathologySlices)
+            middleIdx = int(length/2)
+            idxFixed = []
+            idxMoving = []
+            for i in range(middleIdx-1,length-1):
+                idxFixed.append(i)
+                idxMoving.append(i+1)
+            for i in range(middleIdx-1, 0, -1):
+                idxFixed.append(i)
+                idxMoving.append(i-1)
+            
+            print(idxFixed)
+            print(idxMoving)
+            
+            
+            ### register consecutive histology slices
+            for ifix,imov in zip(idxFixed,idxMoving):
+                print("----Registering slices", ifix, imov, "------")
+                fixPs = self.pathologySlices[ifix]
+                movPs = self.pathologySlices[imov]
+                movPs.registerTo(fixPs,ref)
+
+    def deleteData(self):
+        print("Deleting Volume")
+        for ps in self.pathologySlices:
+            ps.deleteData()
+        self.__init__()
 
 class PathologySlice():
 
@@ -308,7 +488,7 @@ class PathologySlice():
         if self.verbose:
             print("Reading from \'{0}\'".format( self.rgbImageFn) )
             print("Image Size     : {0}".format(self.rgbImageSize))
-            print("Image PixelType: {0}".format(self.rgbPixelType))
+            #print("Image PixelType: {0}".format(self.rgbPixelType))
 
     def loadRgbImage(self):
         if not self.rgbImageFn:
@@ -353,6 +533,20 @@ class PathologySlice():
             return self.rgbImage
         else:
             return rgbImage
+            
+    def getGrayFromRGB(self, im, invert=True):
+        select  = sitk.VectorIndexSelectionCastImageFilter()
+        im_gray = select.Execute(im, 0, sitk.sitkUInt8)
+        im_gray +=select.Execute(im, 1, sitk.sitkUInt8)
+        im_gray +=select.Execute(im, 2, sitk.sitkUInt8)
+        im_gray /= 3
+        
+        if invert:
+            im_gray  = 255 - im_gray
+            
+        
+        return im_gray
+        
 
     def loadMask(self, idxMask):
         if not self.maskDict:
@@ -416,7 +610,7 @@ class PathologySlice():
         # when setting a new reference, the Transform needs to be recomputed
         self.transform = None
 
-    def computeCenterTransform(self, im, ref, mode = 0, doRotate=None):
+    def computeCenterTransform(self, im, ref, mode = 0, doRotate=None, tranform_type = 2):
         # 
         #Input
         #----
@@ -428,22 +622,53 @@ class PathologySlice():
         if not mode:
             select = sitk.VectorIndexSelectionCastImageFilter()
             im0  = select.Execute(im, 0, sitk.sitkUInt8)
-            ref0 = select.Execute(ref[:,:,self.refSliceIdx], 0, sitk.sitkUInt8)
+            
+            # if there are more slices in the exvivo than invivo
+            try: 
+                ref0 = select.Execute(ref[:,:,self.refSliceIdx], 0, sitk.sitkUInt8)
+            except Exception as e:
+                print (e)
+                ref0 = select.Execute(ref[:,:,self.refSliceIdx-1], 0, sitk.sitkUInt8)
+
         else:
             im0 = im
-            ref0 = ref[:,:,self.refSliceIdx]
+            
+            # if there are more slices in the exvivo than invivo
+            try:
+                ref0 = ref[:,:,self.refSliceIdx]
+            except Exception as e:
+                print (e)
+                ref0 = ref[:,:,self.refSliceIdx-1]
 
-        tr = sitk.CenteredTransformInitializer(ref0, im0, 
-            sitk.AffineTransform(im.GetDimension()), 
-            sitk.CenteredTransformInitializerFilter.GEOMETRY)
+
+        if tranform_type==0:
+            tr = sitk.CenteredTransformInitializer(ref0, im0, 
+                sitk.AffineTransform(im.GetDimension()), 
+                sitk.CenteredTransformInitializerFilter.GEOMETRY)
+            self.transform = sitk.AffineTransform(tr)    
+        if tranform_type==1:
+            tr = sitk.CenteredTransformInitializer(ref0, im0, 
+                sitk.Similarity2DTransform(), 
+                sitk.CenteredTransformInitializerFilter.GEOMETRY)
+            self.transform = sitk.Similarity2DTransform(tr)    
+        else:
+            tr = sitk.CenteredTransformInitializer(ref0, im0, 
+                sitk.Euler2DTransform(), 
+                sitk.CenteredTransformInitializerFilter.GEOMETRY)
         
-        self.transform = sitk.AffineTransform(tr)
+            self.transform = sitk.Euler2DTransform(tr)
 
         if doRotate:
             center = ref0.TransformContinuousIndexToPhysicalPoint(
                 np.array(ref0.GetSize())/2.0)
-            rotation = sitk.AffineTransform(im0.GetDimension())
-            rotation.Rotate(0,1,np.radians(doRotate))
+                
+            if tranform_type == 0:
+                rotation = sitk.AffineTransform(im0.GetDimension())
+                rotation.Rotate(0,1,np.radians(doRotate))
+            else:
+                rotation = sitk.Euler2DTransform()
+                rotation.SetAngle(np.radians(doRotate))
+                
             rotation.SetCenter(center)
 
             composite = sitk.Transform(im.GetDimension(), sitk.sitkComposite)
@@ -465,10 +690,9 @@ class PathologySlice():
             
         print("Set Transformed image", self.doRotate)
 
-
         if not self.transform:
             self.computeCenterTransform(im, ref, 0, self.doRotate)
-            
+
         try:    
             im_tr  = sitk.Resample(im, ref[:,:,self.refSliceIdx], self.transform,
                 sitk.sitkNearestNeighbor, 255)
@@ -477,7 +701,12 @@ class PathologySlice():
                 destinationIndex=[0,0,self.refSliceIdx])    
         except Exception as e:
             print(e)
-            print(im_tr, ref_tr, ref)
+            im_tr  = sitk.Resample(im, ref[:,:,self.refSliceIdx-1], self.transform,
+                sitk.sitkNearestNeighbor, 255)
+            ref_tr = sitk.JoinSeries(im_tr)
+            ref    = sitk.Paste(ref, ref_tr, ref_tr.GetSize(), 
+                destinationIndex=[0,0,self.refSliceIdx])  
+
 
 
         return ref 
@@ -501,7 +730,84 @@ class PathologySlice():
                 destinationIndex=[0,0,self.refSliceIdx])
         except Exception as e:
             print(e)
-            print(im_tr, ref_tr, ref)
+            im_tr  = sitk.Resample(im, ref[:,:,self.refSliceIdx-1], 
+                    self.transform, 
+                    sitk.sitkNearestNeighbor)
+            ref_tr = sitk.JoinSeries(im_tr)
+            ref    = sitk.Paste(ref, ref_tr, ref_tr.GetSize(), 
+                destinationIndex=[0,0,self.refSliceIdx])
 
         return ref 
     
+    def registerTo(self, refPs, ref, applyTranf2Ref = True):
+        if applyTranf2Ref:
+            old = refPs.refSliceIdx
+            refPs.refSliceIdx = self.refSliceIdx
+            fixed_image = refPs.setTransformedRgb(ref)[:,:,self.refSliceIdx]
+            refPs.refSliceIdx = old
+        else:
+            fixed_image = refPs.loadRgbImage()
+        
+        fixed_image  = self.getGrayFromRGB(fixed_image)
+        moving_image = self.loadRgbImage()
+        moving_image = self.getGrayFromRGB(moving_image)
+        
+        reg = RegisterImages()
+        self.transform = reg.Register(fixed_image, moving_image, self.transform)
+            
+            
+            
+            
+    def registerToConstrait(self, fixed_image, ref, refMask, applyTranf = True):  
+        if applyTranf:
+            moving_image =  self.setTransformedRgb(ref)[:,:,self.refSliceIdx]  
+        else:
+            moving_image = self.loadRgbImage()
+        
+        moving_image = self.getGrayFromRGB(moving_image)
+          
+        # if image has mask; use it!
+        try:
+            if applyTranf:
+                mask =  self.setTransformedMask(refMask,0)[:,:,self.refSliceIdx]  
+            else:
+                mask = self.loadMask(0)
+        except Exception as e:
+            print("No mask 0 was found")
+            mask = None
+        
+        if mask:
+            mask = sitk.Cast(sitk.Resample(mask, moving_image, sitk.Transform(), 
+                sitk.sitkNearestNeighbor, 0.0, moving_image.GetPixelID())>0,
+                moving_image.GetPixelID())
+            
+            moving_image = moving_image*mask
+            
+            
+        reg = RegisterImages()
+        
+        # use moments, except if mask doesn't exist then use geometric
+        try:
+            transform = sitk.CenteredTransformInitializer(
+                    sitk.Cast(fixed_image, sitk.sitkFloat32), 
+                    sitk.Cast(moving_image, sitk.sitkFloat32), 
+                    sitk.AffineTransform(moving_image.GetDimension()), 
+                    sitk.CenteredTransformInitializerFilter.MOMENTS)
+        except:
+            transform = sitk.CenteredTransformInitializer(
+                    sitk.Cast(fixed_image, sitk.sitkFloat32), 
+                    sitk.Cast(moving_image, sitk.sitkFloat32), 
+                    sitk.AffineTransform(moving_image.GetDimension()), 
+                    sitk.CenteredTransformInitializerFilter.GEOMETRY)
+            
+
+        transform = reg.Register(fixed_image, moving_image, transform)
+        
+        composite = sitk.Transform(moving_image.GetDimension(), sitk.sitkComposite)
+        composite.AddTransform(self.transform)
+        composite.AddTransform(transform)
+        self.transform = composite
+
+    def deleteData(self):
+        print("Deleting Slice")
+        self.__init__();
