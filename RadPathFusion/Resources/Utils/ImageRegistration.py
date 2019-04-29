@@ -22,7 +22,8 @@ class RegisterImages():
             sitk.WriteImage(self.fixed,'fixed.mha')
 
         registration_method = sitk.ImageRegistrationMethod()
-        registration_method.SetMetricAsMeanSquares()
+        #registration_method.SetMetricAsMeanSquares()
+        registration_method.SetMetricAsMattesMutualInformation(numberOfHistogramBins=32)
         
         registration_method.SetMetricSamplingStrategy(registration_method.RANDOM)
         registration_method.SetMetricSamplingPercentage(0.05)

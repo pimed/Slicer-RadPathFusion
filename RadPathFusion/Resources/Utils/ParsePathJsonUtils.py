@@ -16,8 +16,11 @@ class ParsePathJsonUtils():
         self.path=path
     
     def initComponents(self):
+        suscess = 0
         if self.verbose:
             print("initialize components") 
         if self.path:
             self.pathologyVolume.setPath(self.path)
-            self.pathologyVolume.initComponents()
+            success = self.pathologyVolume.initComponents()
+    
+        return success
