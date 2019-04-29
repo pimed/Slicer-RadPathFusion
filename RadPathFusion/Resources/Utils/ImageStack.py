@@ -610,7 +610,7 @@ class PathologySlice():
         # when setting a new reference, the Transform needs to be recomputed
         self.transform = None
 
-    def computeCenterTransform(self, im, ref, mode = 0, doRotate=None, tranform_type = 2):
+    def computeCenterTransform(self, im, ref, mode = 0, doRotate=None, tranform_type = 0):
         # 
         #Input
         #----

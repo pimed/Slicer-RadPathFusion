@@ -513,17 +513,20 @@ class ParsePathJsonLogic():
             import ParsePathJsonUtils as ppju
             self.logic = ppju.ParsePathJsonUtils()
             self.logic.setPath(json_path)
-            success = self.logic.initComponents()
-            if not success:
-                qt.QMessageBox.critical(slicer.util.mainWindow(), "Error","Failure to load json. Check path!")
-                return
+            #success = self.logic.initComponents()
+            #if not success:
+            #    qt.QMessageBox.critical(slicer.util.mainWindow(), "Error","Failure to load json. Check path!")
+            #    return
 
         if not str(self.logic.path)==str(json_path):
             self.logic.setPath(json_path)
-            success = self.logic.initComponents()
-            if not success:
-                qt.QMessageBox.critical(slicer.util.mainWindow(), "Error","Failure to load json. Check path!")
-                return
+            
+        success = self.logic.initComponents()
+        if not success:
+            if widgetPresent:
+                self.cmdEndEvent()  
+            qt.QMessageBox.critical(slicer.util.mainWindow(), "Error","Failure to load json. Check path!")
+            return
 
         if outputVolumeNode:
             slicer.app.processEvents()    
@@ -531,14 +534,10 @@ class ParsePathJsonLogic():
             outputVolume = self.logic.pathologyVolume.loadRgbVolume()
             sitkUtils.PushVolumeToSlicer(outputVolume, 
                 targetNode=outputVolumeNode)
-        
 
             selectionNode = slicer.app.applicationLogic().GetSelectionNode()
             selectionNode.SetReferenceActiveVolumeID(outputVolumeNode.GetID())
             slicer.app.applicationLogic().PropagateVolumeSelection(0)
-            
-
-
         else:
             qt.QMessageBox.critical(slicer.util.mainWindow(), "No Output","Output Volume was not set!")
 
@@ -567,17 +566,20 @@ class ParsePathJsonLogic():
             import ParsePathJsonUtils as ppju
             self.logic = ppju.ParsePathJsonUtils()
             self.logic.setPath(json_path)
-            success = self.logic.initComponents()
-            if not success:
-                qt.QMessageBox.critical(slicer.util.mainWindow(), "Error","Failure to load json. Check path!")
-                return
+            #success = self.logic.initComponents()
+            #if not success:
+            #    qt.QMessageBox.critical(slicer.util.mainWindow(), "Error","Failure to load json. Check path!")
+            #    return
 
         if not str(self.logic.path)==str(json_path):
             self.logic.setPath(json_path)
-            success = self.logic.initComponents()
-            if not success:
-                qt.QMessageBox.critical(slicer.util.mainWindow(), "Error","Failure to load json. Check path!")
-                return
+            
+        success = self.logic.initComponents()
+        if not success:
+            if widgetPresent:
+                self.cmdEndEvent()  
+            qt.QMessageBox.critical(slicer.util.mainWindow(), "Error","Failure to load json. Check path!")
+            return
 
         if outputVolumeNode:
             slicer.app.processEvents()
