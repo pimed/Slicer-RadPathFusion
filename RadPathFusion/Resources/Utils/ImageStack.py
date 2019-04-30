@@ -39,6 +39,10 @@ class PathologyVolume():
         self.volumeDirection    = None
         self.volumeSpacing      = None
         
+        self.refWoContraints    = None
+        self.refWContraints     = None
+        self.mskRefWoContraints = None
+        self.mskRefWContraints  = None        
     
     def initComponents(self):
         """
@@ -402,6 +406,8 @@ class PathologyVolume():
                                 
             ref = self.loadRgbVolume()
             refMask = self.loadMask(0)
+            self.refWContraints     = ref
+            self.mskRefWContraints  = refMask
                 
             for imov in range(self.noSlices):
                 if imov >= len(constraint_range):
@@ -409,11 +415,17 @@ class PathologyVolume():
                 ifix = constraint_range[imov]
                 print("----Refine slice to imaging constraint", imov, ifix, "------")
                 movPs = self.pathologySlices[imov]
-                movPs.registerToConstrait(imC[:,:,ifix], ref, refMask)
+                if self.refWoContraints == None or  self.mskRefWContraints==None:
+                    movPs.registerToConstrait(imC[:,:,ifix], self.refWContraints,self.mskRefWContraints, ref, refMask)
+                else:
+                    movPs.registerToConstrait(imC[:,:,ifix], self.refWoContraints,self.mskRefWoContraints, ref, refMask)
 
         else:
             ref = self.loadRgbVolume()
-        
+            self.refWoContraints = ref
+            self.mskRefWoContraints = self.loadMask(0)
+            
+            
             length = len(self.pathologySlices)
             middleIdx = int(length/2)
             idxFixed = []
@@ -436,6 +448,7 @@ class PathologyVolume():
                 movPs = self.pathologySlices[imov]
                 movPs.registerTo(fixPs,ref)
 
+                
     def deleteData(self):
         print("Deleting Volume")
         for ps in self.pathologySlices:
@@ -758,9 +771,9 @@ class PathologySlice():
             
             
             
-    def registerToConstrait(self, fixed_image, ref, refMask, applyTranf = True):  
+    def registerToConstrait(self, fixed_image, refMov, refMovMask, ref, refMask, applyTranf = True):  
         if applyTranf:
-            moving_image =  self.setTransformedRgb(ref)[:,:,self.refSliceIdx]  
+            moving_image =  self.setTransformedRgb(refMov)[:,:,self.refSliceIdx]  
         else:
             moving_image = self.loadRgbImage()
         
@@ -769,7 +782,7 @@ class PathologySlice():
         # if image has mask; use it!
         try:
             if applyTranf:
-                mask =  self.setTransformedMask(refMask,0)[:,:,self.refSliceIdx]  
+                mask =  self.setTransformedMask(refMovMask,0)[:,:,self.refSliceIdx]  
             else:
                 mask = self.loadMask(0)
         except Exception as e:
