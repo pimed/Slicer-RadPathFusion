@@ -212,7 +212,7 @@ class ParsePathJsonWidget:
         # Clear
         self.clearAllVolumeButton = qt.QPushButton("Clear ALL")
         self.clearAllVolumeButton.toolTip = "Clear"
-        self.clearAllVolumeButton.enabled = True
+        self.clearAllVolumeButton.enabled = False
 
         hlayout = qt.QHBoxLayout()
 
@@ -520,13 +520,14 @@ class ParsePathJsonLogic():
 
         if not str(self.logic.path)==str(json_path):
             self.logic.setPath(json_path)
-            
-        success = self.logic.initComponents()
-        if not success:
-            if widgetPresent:
-                self.cmdEndEvent()  
-            qt.QMessageBox.critical(slicer.util.mainWindow(), "Error","Failure to load json. Check path!")
-            return
+        
+        if not self.logic.successfulInitialization:
+            success = self.logic.initComponents()
+            if not success:
+                if widgetPresent:
+                    self.cmdEndEvent()  
+                qt.QMessageBox.critical(slicer.util.mainWindow(), "Error","Failure to load json. Check path!")
+                return
 
         if outputVolumeNode:
             slicer.app.processEvents()    
@@ -573,13 +574,14 @@ class ParsePathJsonLogic():
 
         if not str(self.logic.path)==str(json_path):
             self.logic.setPath(json_path)
-            
-        success = self.logic.initComponents()
-        if not success:
-            if widgetPresent:
-                self.cmdEndEvent()  
-            qt.QMessageBox.critical(slicer.util.mainWindow(), "Error","Failure to load json. Check path!")
-            return
+        
+        if not self.logic.successfulInitialization:
+            success = self.logic.initComponents()
+            if not success:
+                if widgetPresent:
+                    self.cmdEndEvent()  
+                qt.QMessageBox.critical(slicer.util.mainWindow(), "Error","Failure to load json. Check path!")
+                return
 
         if outputVolumeNode:
             slicer.app.processEvents()
@@ -623,17 +625,20 @@ class ParsePathJsonLogic():
             import ParsePathJsonUtils as ppju
             self.logic = ppju.ParsePathJsonUtils()
             self.logic.setPath(json_path)
-            success = self.logic.initComponents()
-            if not success:
-                qt.QMessageBox.critical(slicer.util.mainWindow(), "Error","Failure to load json. Check path!")
-                return
+            
+            if not self.logic.successfulInitialization:
+                success = self.logic.initComponents()
+                if not success:
+                    qt.QMessageBox.critical(slicer.util.mainWindow(), "Error","Failure to load json. Check path!")
+                    return
 
         if not str(self.logic.path)==str(json_path):
             self.logic.setPath(json_path)
-            success = self.logic.initComponents()
-            if not success:
-                qt.QMessageBox.critical(slicer.util.mainWindow(), "Error","Failure to load json. Check path!")
-                return
+            if not self.logic.successfulInitialization:
+                success = self.logic.initComponents()
+                if not success:
+                    qt.QMessageBox.critical(slicer.util.mainWindow(), "Error","Failure to load json. Check path!")
+                    return
 
         if outputVolumeNode:
             import sitkUtils
@@ -681,17 +686,19 @@ class ParsePathJsonLogic():
             import ParsePathJsonUtils as ppju
             self.logic = ppju.ParsePathJsonUtils()
             self.logic.setPath(json_path)
-            success = self.logic.initComponents()
-            if not success:
-                qt.QMessageBox.critical(slicer.util.mainWindow(), "Error","Failure to load json. Check path!")
-                return
+            if not self.logic.successfulInitialization:
+                success = self.logic.initComponents()
+                if not success:
+                    qt.QMessageBox.critical(slicer.util.mainWindow(), "Error","Failure to load json. Check path!")
+                    return
 
         if not str(self.logic.path)==str(json_path):
             self.logic.setPath(json_path)
-            success = self.logic.initComponents()
-            if not success:
-                qt.QMessageBox.critical(slicer.util.mainWindow(), "Error","Failure to load json. Check path!")
-                return
+            if not self.logic.successfulInitialization:
+                success = self.logic.initComponents()
+                if not success:
+                    qt.QMessageBox.critical(slicer.util.mainWindow(), "Error","Failure to load json. Check path!")
+                    return
 
 
         if idxMask>=0 and outputMaskVolumeNode:
