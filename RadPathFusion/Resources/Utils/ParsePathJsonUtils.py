@@ -11,6 +11,7 @@ class ParsePathJsonUtils():
         self.path = None
         self.pathologyVolume = PathologyVolume()
         self.storeVolume = False
+        self.successfulInitialization = None
 
     def setPath(self, path):
         self.path=path
@@ -22,5 +23,7 @@ class ParsePathJsonUtils():
         if self.path:
             self.pathologyVolume.setPath(self.path)
             success = self.pathologyVolume.initComponents()
+            self.successfulInitialization = self.pathologyVolume.successfulInitialization
+            
     
         return success

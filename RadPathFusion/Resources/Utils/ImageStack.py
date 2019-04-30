@@ -42,7 +42,9 @@ class PathologyVolume():
         self.refWoContraints    = None
         self.refWContraints     = None
         self.mskRefWoContraints = None
-        self.mskRefWContraints  = None        
+        self.mskRefWContraints  = None    
+
+        self.successfulInitialization = False;
     
     def initComponents(self):
         """
@@ -54,6 +56,7 @@ class PathologyVolume():
 
         if not self.path:
             print("The path was not set");
+            self.successfulInitialization = False
             return 0;
 
         if self.verbose:
@@ -63,6 +66,7 @@ class PathologyVolume():
             data = json.load(open(self.path))
         except Exception as e:
             print(e)
+            self.successfulInitialization = False
             return 0
         self.jsonDict = data
 
@@ -135,7 +139,8 @@ class PathologyVolume():
             print("Found {:d} slices @ max size {}".format(self.noSlices,
                 self.maxSliceSize))
             print("Create volume at {}".format(self.volumeSize))
-            
+        
+        self.successfulInitialization = True;
         return 1
 
     def printTransform(self, ref=None):
@@ -176,6 +181,7 @@ class PathologyVolume():
            
             if not ps.refSize:
                 ps.setReference(vol) 
+            print("Rotate in sl",i, ps.doRotate, self.pathologySlices[i].doRotate)
             vol = ps.setTransformedRgb(vol)
 
 
@@ -274,15 +280,19 @@ class PathologyVolume():
                 jsonValue = value
                 
             if param  == 'rotation_angle':
+                
                 self.pathologySlices[idx].doRotate = value
                 jsonKey = True        
+                print('Rotating', idx,self.pathologySlices[idx].doRotate )
                 jsonValue = value
                 
             if not jsonKey:
                 print("Adding new key", param)
                 
             if param  == 'flip' or param  == 'rotation_angle':
-                if not self.jsonDict[self.pathologySlices[idx].jsonKey]['transform']:
+                #if not 'transform' in self.jsonDict[self.pathologySlices[idx].jsonKey]['transform']:
+                #key doesn't not exit
+                if not 'transform' in self.jsonDict[self.pathologySlices[idx].jsonKey]:
                     self.jsonDict[self.pathologySlices[idx].jsonKey]['transform']={}
                 self.jsonDict[self.pathologySlices[idx].jsonKey]['transform'][param] = jsonValue
             else:
