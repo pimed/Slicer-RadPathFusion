@@ -11,6 +11,7 @@ class PathologyVolume():
         self.path = None
 
         self.noRegions = 0
+        self.regionIDs = None
         self.noSlices = 0
         # in micrometers
         self.pix_size_x = 0
@@ -74,7 +75,7 @@ class PathologyVolume():
         self.pix_size_y = 0
 
         self.pathologySlices = []
-
+        self.regionIDs = []
         for key in np.sort(list(self.jsonDict)):
             ps            = PathologySlice()
             ps.jsonKey    = key
@@ -106,6 +107,11 @@ class PathologyVolume():
             
             if self.noRegions < len(list(data[key]['regions'])):            
                 self.noRegions = len(list(data[key]['regions']))
+                for r in list(data[key]['regions']):
+                    if not r in self.regionIDs:
+                        print("Adding region ", r)
+                        self.regionIDs.append(r)
+            
 
             xml_res_x = None
             try: #new xml format
@@ -327,14 +333,14 @@ class PathologyVolume():
             try:
                 self.imagingContraint  = sitk.ReadImage(self.imagingContraintFilename,sitk.sitkFloat32)
             except Exception as e:
-                print("Failed to read", self.imagingContraintFilename)
+                print(e)
         
         # if we have a filename but not mask        
         if not self.imagingContraintMask and self.imagingContraintMaskFilename:
             try:
                 self.imagingContraintMask = sitk.ReadImage(self.imagingContraintMaskFilename)
             except Exception as e:
-                print("Failed to read", self.imagingContraintMaskFilename)
+                print(e)
 
         self.imagingContraintMask = sitk.Cast(
             sitk.Resample(self.imagingContraintMask>0, 
@@ -413,6 +419,8 @@ class PathologyVolume():
                 print("No contraints will be used")
                 useImagingConstaint = False
                 return
+                
+            #sitk.WriteImage(imC, "fixed3D.nii.gz")
                                 
             ref = self.loadRgbVolume()
             refMask = self.loadMask(0)
