@@ -112,7 +112,7 @@ class PathologyVolume():
                     print("Adding region ", r)
                     self.regionIDs.append(r)
             self.noRegions = len(self.regionIDs)
-            
+            print("Done", self.noRegions)
 
             xml_res_x = None
             try: #new xml format
