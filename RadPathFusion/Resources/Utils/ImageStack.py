@@ -596,10 +596,13 @@ class PathologySlice():
             fn = self.maskDict[mask_key]['filename']
             #FIXME: should be consistent with the slice idx (which is read from tag 
             #slice_number)
-            try:
-                readIdxMask = int(mask_key[6:])
-            except:
-                readIdxMask = 1
+            for idxRegion, r in self.regionIDs:
+                if mask_key == r:
+                    readIdxMask = idxRegion
+            #try:
+            #    readIdxMask = int(mask_key[6:])
+            #except:
+            #    readIdxMask = 1
 
             if self.verbose:
                 print("Mask:", idxMask, readIdxMask, fn)
