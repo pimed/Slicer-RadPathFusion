@@ -504,7 +504,7 @@ class PathologySlice():
 
         self.unitMode   = 0 #microns; 1-milimeters
 
-        self.verbose    = True
+        self.verbose    = False
         self.regionIDs  = None
         
 
@@ -596,7 +596,7 @@ class PathologySlice():
             fn = self.maskDict[mask_key]['filename']
             #FIXME: should be consistent with the slice idx (which is read from tag 
             #slice_number)
-            for idxRegion, r in self.regionIDs:
+            for idxRegion, r in enumerate(self.regionIDs):
                 if mask_key == r:
                     readIdxMask = idxRegion
             #try:
