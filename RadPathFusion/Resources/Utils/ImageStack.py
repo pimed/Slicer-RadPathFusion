@@ -105,12 +105,13 @@ class PathologyVolume():
                 ps.refSliceIdx = len(self.pathologySlices)
             self.pathologySlices.append(ps)
             
-            if self.noRegions < len(list(data[key]['regions'])):            
-                self.noRegions = len(list(data[key]['regions']))
-                for r in list(data[key]['regions']):
-                    if not r in self.regionIDs:
-                        print("Adding region ", r)
-                        self.regionIDs.append(r)
+            #if self.noRegions < len(list(data[key]['regions'])):            
+            #    self.noRegions = len(list(data[key]['regions']))
+            for r in list(data[key]['regions']):
+                if not r in self.regionIDs:
+                    print("Adding region ", r)
+                    self.regionIDs.append(r)
+            self.noRegions = len(self.regionIDs)
             
 
             xml_res_x = None
