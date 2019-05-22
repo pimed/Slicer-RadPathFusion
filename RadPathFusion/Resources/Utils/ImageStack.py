@@ -103,7 +103,6 @@ class PathologyVolume():
                 ps.refSliceIdx = int( idx )-1
             else:
                 ps.refSliceIdx = len(self.pathologySlices)
-            self.pathologySlices.append(ps)
             
             #if self.noRegions < len(list(data[key]['regions'])):            
             #    self.noRegions = len(list(data[key]['regions']))
@@ -114,6 +113,12 @@ class PathologyVolume():
             self.noRegions = len(self.regionIDs)
             print("Done", self.noRegions)
 
+            # set the list with region ID so the slice know what ids to assign to
+            # regions that are global
+            ps.regionIDs = self.regionIDs
+            self.pathologySlices.append(ps)
+  
+  
             xml_res_x = None
             try: #new xml format
                 xml_res_x = float(data[key]['resolution_x_um'])
@@ -500,6 +505,7 @@ class PathologySlice():
         self.unitMode   = 0 #microns; 1-milimeters
 
         self.verbose    = True
+        self.regionIDs  = None
         
 
     def loadImageSize(self):
