@@ -7,7 +7,7 @@ from ImageRegistration import RegisterImages
 class PathologyVolume():
 
     def __init__(self, parent=None):
-        self.verbose = True
+        self.verbose = False
         self.path = None
 
         self.noRegions = 0
@@ -108,10 +108,10 @@ class PathologyVolume():
             #    self.noRegions = len(list(data[key]['regions']))
             for r in list(data[key]['regions']):
                 if not r in self.regionIDs:
-                    print("Adding region ", r)
+                    #print("Adding region ", r)
                     self.regionIDs.append(r)
             self.noRegions = len(self.regionIDs)
-            print("Done", self.noRegions)
+            #print("Done", self.noRegions)
 
             # set the list with region ID so the slice know what ids to assign to
             # regions that are global
@@ -193,7 +193,7 @@ class PathologyVolume():
            
             if not ps.refSize:
                 ps.setReference(vol) 
-            print("Rotate in sl",i, ps.doRotate, self.pathologySlices[i].doRotate)
+            #print("Rotate in sl",i, ps.doRotate, self.pathologySlices[i].doRotate)
             vol = ps.setTransformedRgb(vol)
 
 
@@ -461,9 +461,8 @@ class PathologyVolume():
                 idxFixed.append(i)
                 idxMoving.append(i-1)
             
-            print(idxFixed)
-            print(idxMoving)
-            
+            #print(idxFixed)
+            #print(idxMoving)
             
             ### register consecutive histology slices
             for ifix,imov in zip(idxFixed,idxMoving):
@@ -594,24 +593,21 @@ class PathologySlice():
         maskFn = None
         for mask_key in list(self.maskDict):
             fn = self.maskDict[mask_key]['filename']
-            #FIXME: should be consistent with the slice idx (which is read from tag 
-            #slice_number)
             for idxRegion, r in enumerate(self.regionIDs):
                 if mask_key == r:
                     readIdxMask = idxRegion
-            #try:
-            #    readIdxMask = int(mask_key[6:])
-            #except:
-            #    readIdxMask = 1
-
+            
             if self.verbose:
                 print("Mask:", idxMask, readIdxMask, fn)
 
             if readIdxMask == idxMask:
                 maskFn = fn
 
-        if not maskFn:
+        if self.verbose and not maskFn:
             print("Mask", idxMask, "not found for slice", self.refSliceIdx)
+
+        if not maskFn:
+            return None
 
         try:
             im = sitk.ReadImage(str(maskFn))
@@ -729,7 +725,7 @@ class PathologySlice():
         if not im:
             return ref
             
-        print("Set Transformed image", self.doRotate)
+        #print("Set Transformed image", self.doRotate)
 
         if not self.transform:
             self.computeCenterTransform(im, ref, 0, self.doRotate)
