@@ -43,7 +43,8 @@ class PathologyVolume():
         self.refWoContraints    = None
         self.refWContraints     = None
         self.mskRefWoContraints = None
-        self.mskRefWContraints  = None    
+        self.mskRefWContraints  = None
+        self.doDeformable       = None
 
         self.successfulInitialization = False;
     
@@ -439,10 +440,11 @@ class PathologyVolume():
                 ifix = constraint_range[imov]
                 print("----Refine slice to imaging constraint", imov, ifix, "------")
                 movPs = self.pathologySlices[imov]
+                movPs.doDeformable = self.doDeformable
                 if self.refWoContraints == None or  self.mskRefWContraints==None:
-                    movPs.registerToConstrait(imC[:,:,ifix], self.refWContraints,self.mskRefWContraints, ref, refMask)
+                    movPs.registerToConstrait(imC[:,:,ifix], self.refWContraints,self.mskRefWContraints, ref, refMask, ifix)
                 else:
-                    movPs.registerToConstrait(imC[:,:,ifix], self.refWoContraints,self.mskRefWoContraints, ref, refMask)
+                    movPs.registerToConstrait(imC[:,:,ifix], self.refWoContraints,self.mskRefWoContraints, ref, refMask, ifix)
 
         else:
             ref = self.loadRgbVolume()
@@ -505,6 +507,7 @@ class PathologySlice():
 
         self.verbose    = False
         self.regionIDs  = None
+        self.doDeformable = None
         
 
     def loadImageSize(self):
@@ -790,12 +793,12 @@ class PathologySlice():
         moving_image = self.getGrayFromRGB(moving_image)
         
         reg = RegisterImages()
-        self.transform = reg.Register(fixed_image, moving_image, self.transform)
+        self.transform = reg.RegisterAffine(fixed_image, moving_image, self.transform)
             
             
             
             
-    def registerToConstrait(self, fixed_image, refMov, refMovMask, ref, refMask, applyTranf = True):  
+    def registerToConstrait(self, fixed_image, refMov, refMovMask, ref, refMask, idx, applyTranf = True):  
         if applyTranf:
             moving_image =  self.setTransformedRgb(refMov)[:,:,self.refSliceIdx]  
         else:
@@ -838,12 +841,20 @@ class PathologySlice():
                     sitk.CenteredTransformInitializerFilter.GEOMETRY)
             
 
-        transform = reg.Register(fixed_image, moving_image, transform)
+        transform = reg.RegisterAffine(fixed_image, moving_image, transform)
         
         composite = sitk.Transform(moving_image.GetDimension(), sitk.sitkComposite)
         composite.AddTransform(self.transform)
         composite.AddTransform(transform)
         self.transform = composite
+
+        if self.doDeformable:
+            transform_def = reg.RegisterDeformable(fixed_image, moving_image, transform , 10, idx)
+            
+            composite = sitk.Transform(moving_image.GetDimension(), sitk.sitkComposite)
+            composite.AddTransform(self.transform)
+            composite.AddTransform(transform_def)
+            self.transform = composite
 
     def deleteData(self):
         print("Deleting Slice")
