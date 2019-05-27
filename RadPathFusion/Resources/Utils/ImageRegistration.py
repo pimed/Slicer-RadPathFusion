@@ -9,7 +9,7 @@ class RegisterImages():
         self.deformable_transform = None
         self.verbose = True
         
-    def RegisterAffine(self, fixed_img, moving_img, initial_transf, debug=False     ):
+    def RegisterAffine(self, fixed_img, moving_img, initial_transf, idx = 0, debug=False):
         self.fixed  = sitk.Cast(fixed_img, sitk.sitkFloat32)
         self.moving = sitk.Cast(moving_img, sitk.sitkFloat32)
         
@@ -19,8 +19,8 @@ class RegisterImages():
         if debug:
             moving_resampled = sitk.Resample(self.moving, self.fixed,
                 self.initial_transform, sitk.sitkLinear, 0.0, self.moving.GetPixelID())
-            sitk.WriteImage(moving_resampled,'moving.mha')
-            sitk.WriteImage(self.fixed,'fixed.mha')
+            sitk.WriteImage(moving_resampled,'moving_{:d}.mha'.format(idx))
+            sitk.WriteImage(self.fixed,'fixed_{:d}.mha'.format(idx))
 
         registration_method = sitk.ImageRegistrationMethod()
         #registration_method.SetMetricAsMeanSquares()
@@ -49,7 +49,7 @@ class RegisterImages():
         if debug:
             moving_resampled = sitk.Resample(self.moving, self.fixed,
                 self.initial_transform, sitk.sitkLinear, 0.0, self.moving.GetPixelID())
-            sitk.WriteImage(moving_resampled,'moved.mha')
+            sitk.WriteImage(moving_resampled,'moved_{:d}.mha'.format(idx))
 
         if self.verbose: 
             print("Done Running Affine Registration!")
