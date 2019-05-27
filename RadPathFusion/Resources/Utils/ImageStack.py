@@ -427,7 +427,7 @@ class PathologyVolume():
                 useImagingConstaint = False
                 return
                 
-            #sitk.WriteImage(imC, "fixed3D.nii.gz")
+            sitk.WriteImage(imC, "fixed3D.nii.gz")
                                 
             ref = self.loadRgbVolume()
             refMask = self.loadMask(0)
@@ -823,7 +823,7 @@ class PathologySlice():
             
             moving_image = moving_image*mask
             
-            
+        #sitk.WriteImage(moving_resampled,'moving_first_{:d}.mha'.format(idx))    
         reg = RegisterImages()
         
         # use moments, except if mask doesn't exist then use geometric
@@ -841,7 +841,7 @@ class PathologySlice():
                     sitk.CenteredTransformInitializerFilter.GEOMETRY)
             
 
-        transform = reg.RegisterAffine(fixed_image, moving_image, transform)
+        transform = reg.RegisterAffine(fixed_image, moving_image, transform, idx)
         
         composite = sitk.Transform(moving_image.GetDimension(), sitk.sitkComposite)
         composite.AddTransform(self.transform)
