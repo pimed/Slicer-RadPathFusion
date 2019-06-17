@@ -44,6 +44,7 @@ class PathologyVolume():
         self.refWContraints     = None
         self.mskRefWoContraints = None
         self.mskRefWContraints  = None
+        self.doAffine           = True
         self.doDeformable       = None
 
         self.successfulInitialization = False;
@@ -440,7 +441,12 @@ class PathologyVolume():
                 ifix = constraint_range[imov]
                 print("----Refine slice to imaging constraint", imov, ifix, "------")
                 movPs = self.pathologySlices[imov]
-                movPs.doDeformable = self.doDeformable
+                movPs.doAffine      = self.doAffine
+                movPs.doDeformable  = self.doDeformable
+                        
+                print("Do affine 1:",movPs.doAffine)
+                print("Do deformable 1:",movPs.doDeformable)
+
                 if self.refWoContraints == None or  self.mskRefWContraints==None:
                     movPs.registerToConstrait(imC[:,:,ifix], self.refWContraints,self.mskRefWContraints, ref, refMask, ifix)
                 else:
@@ -471,6 +477,7 @@ class PathologyVolume():
                 print("----Registering slices", ifix, imov, "------")
                 fixPs = self.pathologySlices[ifix]
                 movPs = self.pathologySlices[imov]
+                movPs.doAffine      = self.doAffine
                 movPs.registerTo(fixPs,ref)
 
                 
@@ -507,6 +514,7 @@ class PathologySlice():
 
         self.verbose    = False
         self.regionIDs  = None
+        self.doAffine   = True
         self.doDeformable = None
         
 
@@ -791,11 +799,31 @@ class PathologySlice():
         fixed_image  = self.getGrayFromRGB(fixed_image)
         moving_image = self.loadRgbImage()
         moving_image = self.getGrayFromRGB(moving_image)
+
         
-        reg = RegisterImages()
-        self.transform = reg.RegisterAffine(fixed_image, moving_image, self.transform)
-            
-            
+        print("Do affine2:",self.doAffine)
+        print("Do deformable2:",self.doDeformable)
+        
+        if self.doAffine:
+            reg = RegisterImages()
+            self.transform = reg.RegisterAffine(fixed_image, moving_image, self.transform)
+        """
+        else:
+            # use moments, except if mask doesn't exist then use geometric
+            # no registration should be done, but at least align the data
+            try:
+                self.transform = sitk.CenteredTransformInitializer(
+                        sitk.Cast(fixed_image, sitk.sitkFloat32), 
+                        sitk.Cast(moving_image, sitk.sitkFloat32), 
+                        sitk.AffineTransform(moving_image.GetDimension()), 
+                        sitk.CenteredTransformInitializerFilter.MOMENTS)
+            except:
+                self.transform = sitk.CenteredTransformInitializer(
+                        sitk.Cast(fixed_image, sitk.sitkFloat32), 
+                        sitk.Cast(moving_image, sitk.sitkFloat32), 
+                        sitk.AffineTransform(moving_image.GetDimension()), 
+                        sitk.CenteredTransformInitializerFilter.GEOMETRY)
+        """    
             
             
     def registerToConstrait(self, fixed_image, refMov, refMovMask, ref, refMask, idx, applyTranf = True):  
@@ -839,14 +867,22 @@ class PathologySlice():
                     sitk.Cast(moving_image, sitk.sitkFloat32), 
                     sitk.AffineTransform(moving_image.GetDimension()), 
                     sitk.CenteredTransformInitializerFilter.GEOMETRY)
-            
 
-        transform = reg.RegisterAffine(fixed_image, moving_image, transform, idx)
-        
         composite = sitk.Transform(moving_image.GetDimension(), sitk.sitkComposite)
         composite.AddTransform(self.transform)
         composite.AddTransform(transform)
         self.transform = composite
+        
+        print("Do affine:",self.doAffine)
+        print("Do deformable:",self.doDeformable)
+
+        if self.doAffine:
+            transform = reg.RegisterAffine(fixed_image, moving_image, transform, idx)
+            
+            composite = sitk.Transform(moving_image.GetDimension(), sitk.sitkComposite)
+            composite.AddTransform(self.transform)
+            composite.AddTransform(transform)
+            self.transform = composite
 
         if self.doDeformable:
             transform_def = reg.RegisterDeformable(fixed_image, moving_image, transform , 10, idx)
