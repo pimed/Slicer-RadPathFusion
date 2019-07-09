@@ -7,12 +7,12 @@ from ImageRegistration import RegisterImages
 class PathologyVolume():
 
     def __init__(self, parent=None):
-        self.verbose = False
-        self.path = None
+        self.verbose    = False
+        self.path       = None
 
-        self.noRegions = 0
-        self.regionIDs = None
-        self.noSlices = 0
+        self.noRegions  = 0
+        self.regionIDs  = None
+        self.noSlices   = 0
         # in micrometers
         self.pix_size_x = 0
         self.pix_size_y = 0
@@ -23,14 +23,14 @@ class PathologyVolume():
         self.rgbVolume    = None
         self.storeVolume  = False
 
-        self.inPlaneScaling = 1.2
+        self.inPlaneScaling     = 1.2
          
-        self.pathologySlices = None
-        self.jsonDict     = None
+        self.pathologySlices    = None
+        self.jsonDict           = None
         
         #filenames if needed to load here
-        self.imagingContraintFilename = None
-        self.imagingContraintMaskFilename = None
+        self.imagingContraintFilename       = None
+        self.imagingContraintMaskFilename   = None
         
         #files 
         self.imagingContraint       = None
@@ -55,7 +55,7 @@ class PathologyVolume():
         Does NOT Read the actual images; Does NOT Create the volume
         """
         if self.verbose:
-            print("initialize components") 
+            print("PathologyVolume: Initialize components") 
 
         if not self.path:
             print("The path was not set");
@@ -63,7 +63,7 @@ class PathologyVolume():
             return 0;
 
         if self.verbose:
-            print("Loading from", self.path)
+            print("PathologyVolume: Loading from", self.path)
         
         try:
             data = json.load(open(self.path))
@@ -150,9 +150,9 @@ class PathologyVolume():
             self.noSlices]
 
         if self.verbose:
-            print("Found {:d} slices @ max size {}".format(self.noSlices,
+            print("PathologyVolume: Found {:d} slices @ max size {}".format(self.noSlices,
                 self.maxSliceSize))
-            print("Create volume at {}".format(self.volumeSize))
+            print("PathologyVolume: Create volume at {}".format(self.volumeSize))
         
         self.successfulInitialization = True;
         return 1
@@ -428,7 +428,7 @@ class PathologyVolume():
                 useImagingConstaint = False
                 return
                 
-            sitk.WriteImage(imC, "fixed3D.nii.gz")
+            #sitk.WriteImage(imC, "fixed3D.nii.gz")
                                 
             ref = self.loadRgbVolume()
             refMask = self.loadMask(0)
@@ -478,7 +478,7 @@ class PathologyVolume():
                 fixPs = self.pathologySlices[ifix]
                 movPs = self.pathologySlices[imov]
                 movPs.doAffine      = self.doAffine
-                movPs.registerTo(fixPs,ref)
+                movPs.registerTo(fixPs,ref, True, 10+imov)
 
                 
     def deleteData(self):
@@ -490,32 +490,32 @@ class PathologyVolume():
 class PathologySlice():
 
     def __init__(self):
-        self.id = None
+        self.verbose    = False
+        self.id         = None
         self.rgbImageFn = None
         self.maskDict   = None
         self.doFlip     = None
         self.doRotate   = None
 
-        self.rgbImageSize = None
-        self.rgbPixelType = None
-        self.dimension    = None
-        self.rgbImage   = None
-        self.storeImage = False
+        self.rgbImageSize   = None
+        self.rgbPixelType   = None
+        self.dimension      = None
+        self.rgbImage       = None
+        self.storeImage     = False
 
         #once the slice gets projected on the reference model, we have all this information
-        self.transform  = None
-        self.refSize    = None
-        self.refSpacing = None
-        self.refOrigin  = None
-        self.refDirection= None
-        self.refSliceIdx= None # which slice in the reference volume
+        self.transform      = None
+        self.refSize        = None
+        self.refSpacing     = None
+        self.refOrigin      = None
+        self.refDirection   = None
+        self.refSliceIdx    = None # which slice in the reference volume
 
-        self.unitMode   = 0 #microns; 1-milimeters
+        self.unitMode       = 0 #microns; 1-milimeters
 
-        self.verbose    = False
-        self.regionIDs  = None
-        self.doAffine   = True
-        self.doDeformable = None
+        self.regionIDs      = None
+        self.doAffine       = True
+        self.doDeformable   = None
         
 
     def loadImageSize(self):
@@ -534,8 +534,8 @@ class PathologySlice():
         self.dimension = reader.GetDimension()
 
         if self.verbose:
-            print("Reading from \'{0}\'".format( self.rgbImageFn) )
-            print("Image Size     : {0}".format(self.rgbImageSize))
+            print("PathologySlice: Reading from \'{0}\'".format( self.rgbImageFn) )
+            print("PathologySlice: Image Size     : {0}".format(self.rgbImageSize))
             #print("Image PixelType: {0}".format(self.rgbPixelType))
 
     def loadRgbImage(self):
@@ -556,7 +556,7 @@ class PathologySlice():
 
 
         if self.verbose:
-            print("Reading {:d} ({:d},{}) from \'{}\'".format(self.refSliceIdx, 
+            print("PathologySlice: Reading {:d} ({:d},{}) from \'{}\'".format(self.refSliceIdx, 
                 self.doFlip, 
                 self.doRotate,
                 self.rgbImageFn) )
@@ -609,13 +609,13 @@ class PathologySlice():
                     readIdxMask = idxRegion
             
             if self.verbose:
-                print("Mask:", idxMask, readIdxMask, fn)
+                print("PathologySlice: Mask:", idxMask, readIdxMask, fn)
 
             if readIdxMask == idxMask:
                 maskFn = fn
 
         if self.verbose and not maskFn:
-            print("Mask", idxMask, "not found for slice", self.refSliceIdx)
+            print("PathologySlice: Mask", idxMask, "not found for slice", self.refSliceIdx)
 
         if not maskFn:
             return None
@@ -644,7 +644,7 @@ class PathologySlice():
             im =im2
  
         if self.verbose:
-            print("Reading {:d} from \'{}\'".format(self.refSliceIdx, maskFn))
+            print("PathologySlice: Reading {:d} from \'{}\'".format(self.refSliceIdx, maskFn))
 
         return im
 
@@ -706,7 +706,8 @@ class PathologySlice():
         
             self.transform = sitk.Euler2DTransform(tr)
 
-        if doRotate:
+        #if doRotate:
+        if True:
             center = ref0.TransformContinuousIndexToPhysicalPoint(
                 np.array(ref0.GetSize())/2.0)
                 
@@ -778,6 +779,7 @@ class PathologySlice():
                 destinationIndex=[0,0,self.refSliceIdx])
         except Exception as e:
             print(e)
+            print("The index doesn't exist",refSliceIdx)
             im_tr  = sitk.Resample(im, ref[:,:,self.refSliceIdx-1], 
                     self.transform, 
                     sitk.sitkNearestNeighbor)
@@ -787,7 +789,7 @@ class PathologySlice():
 
         return ref 
     
-    def registerTo(self, refPs, ref, applyTranf2Ref = True):
+    def registerTo(self, refPs, ref, applyTranf2Ref = True, idx = 0):
         if applyTranf2Ref:
             old = refPs.refSliceIdx
             refPs.refSliceIdx = self.refSliceIdx
@@ -800,13 +802,13 @@ class PathologySlice():
         moving_image = self.loadRgbImage()
         moving_image = self.getGrayFromRGB(moving_image)
 
-        
-        print("Do affine2:",self.doAffine)
-        print("Do deformable2:",self.doDeformable)
+        if self.verbose:
+            print("PathologySlice: Do no constraints affine:",self.doAffine)
+            print("PathologySlice: Do no constraints deformable:",self.doDeformable)
         
         if self.doAffine:
             reg = RegisterImages()
-            self.transform = reg.RegisterAffine(fixed_image, moving_image, self.transform)
+            self.transform = reg.RegisterAffine(fixed_image, moving_image, self.transform, idx)
         """
         else:
             # use moments, except if mask doesn't exist then use geometric
@@ -868,13 +870,15 @@ class PathologySlice():
                     sitk.AffineTransform(moving_image.GetDimension()), 
                     sitk.CenteredTransformInitializerFilter.GEOMETRY)
 
-        composite = sitk.Transform(moving_image.GetDimension(), sitk.sitkComposite)
-        composite.AddTransform(self.transform)
-        composite.AddTransform(transform)
-        self.transform = composite
+        if not self.doAffine and not self.doDeformable:
+            composite = sitk.Transform(moving_image.GetDimension(), sitk.sitkComposite)
+            composite.AddTransform(self.transform)
+            composite.AddTransform(transform)
+            self.transform = composite
         
-        print("Do affine:",self.doAffine)
-        print("Do deformable:",self.doDeformable)
+        if self.verbose:
+            print("PathologySlice: Do constraints affine:",self.doAffine)
+            print("PathologySlice: Do constraints deformable:",self.doDeformable)
 
         if self.doAffine:
             transform = reg.RegisterAffine(fixed_image, moving_image, transform, idx)
