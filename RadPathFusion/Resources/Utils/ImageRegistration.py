@@ -81,17 +81,18 @@ class RegisterImages():
 
 
         # Optimizer settings.
-        registration_method.SetOptimizerAsGradientDescent(learningRate=.2, 
-            numberOfIterations=250, convergenceMinimumValue=1e-4, convergenceWindowSize=30)
-        #registration_method.SetOptimizerAsGradientDescent(learningRate=.1, 
-        #    numberOfIterations=100, convergenceMinimumValue=1e-6, convergenceWindowSize=10)
+        #registration_method.SetOptimizerAsGradientDescent(learningRate=.2, 
+        #    numberOfIterations=250, convergenceMinimumValue=1e-4, convergenceWindowSize=30)
+        registration_method.SetOptimizerAsGradientDescent(learningRate=.1, 
+            numberOfIterations=100, convergenceMinimumValue=1e-6, convergenceWindowSize=10)
         #registration_method.SetOptimizerScalesFromPhysicalShift()
 
         # Setup for the multi-resolution framework.            
-        #registration_method.SetShrinkFactorsPerLevel(shrinkFactors = [16,8,4])
-        #registration_method.SetSmoothingSigmasPerLevel(smoothingSigmas=[4,2,1])
-        registration_method.SetShrinkFactorsPerLevel(shrinkFactors = [32,16,8,4])
-        registration_method.SetSmoothingSigmasPerLevel(smoothingSigmas=[8,4,2,1])
+        registration_method.SetShrinkFactorsPerLevel(shrinkFactors = [16,8,4])
+        registration_method.SetSmoothingSigmasPerLevel(smoothingSigmas=[4,2,1])
+        #registration_method.SetShrinkFactorsPerLevel(shrinkFactors = [32,16,8,4])
+        #registration_method.SetSmoothingSigmasPerLevel(smoothingSigmas=[8,4,2,1])
+        
         #registration_method.SetShrinkFactorsPerLevel(shrinkFactors = [32,16,8])
         #registration_method.SetSmoothingSigmasPerLevel(smoothingSigmas=[8,4,2])
         #
