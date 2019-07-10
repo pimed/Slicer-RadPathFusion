@@ -779,7 +779,7 @@ class PathologySlice():
                 destinationIndex=[0,0,self.refSliceIdx])
         except Exception as e:
             print(e)
-            print("The index doesn't exist",refSliceIdx)
+            print("The index doesn't exist",self.refSliceIdx)
             im_tr  = sitk.Resample(im, ref[:,:,self.refSliceIdx-1], 
                     self.transform, 
                     sitk.sitkNearestNeighbor)
