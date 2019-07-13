@@ -2,6 +2,8 @@ import SimpleITK as sitk
 import numpy as np
 import matplotlib.pyplot as plt
 import time
+from ipywidgets import interact, fixed
+
         
 class RegisterImages():
     def __init__(self):
@@ -11,7 +13,59 @@ class RegisterImages():
         self.deformable_transform = None
         self.verbose = False
         
+    def display_images(self, fixed_npa, fixed, moving, registration_method, fn):
+        # Create a figure with two subplots and the specified size.
+        #global metric_values
+        plt.subplots(1,2,figsize=(10,8))
+		
+        # Draw the fixed image in the first subplot.
+        plt.subplot(1,2,1)
+        plt.imshow(fixed_npa,cmap=plt.cm.Greys_r)
+        plt.title('fixed image')
+        plt.axis('off')
+		
+        print(registration_method.GetCurrentLevel(), np.min(fixed_npa),np.max(fixed_npa))
+        #get_current_transform
+        current_transform = sitk.Transform(registration_method.GetInitialTransform())
+        current_transform.SetParameters(registration_method.GetOptimizerPosition())
         
+        moving = sitk.Resample(moving,fixed, current_transform)
+        moving_npa = sitk.GetArrayFromImage(moving)
+        print(np.min(moving_npa), np.max(moving_npa))
+        # Draw the moving image in the second subplot.
+        plt.subplot(1,2,2)
+        plt.imshow(moving_npa-fixed_npa,cmap=plt.cm.Greys_r);
+        plt.title('moving image')
+        plt.axis('off')
+		
+		#plt.show()
+        fn = "{:s}_{:03d}.png".format(fn,len(metric_values))
+        plt.savefig(fn)
+        plt.close()
+        
+        """
+        print(registration_method.GetCurrentLevel(), np.min(fixed_npa),np.max(fixed_npa))
+        #get_current_transform
+        current_transform = sitk.Transform(registration_method.GetInitialTransform())
+        current_transform.SetParameters(registration_method.GetOptimizerPosition())
+        
+        fn1 = "{:s}_{:03d}.mha".format(fn,len(metric_values))
+        moving = sitk.Resample(moving,fixed, current_transform)
+        
+        sitk.WriteImage(moving-fixed, fn1)
+        fn1 = "{:s}_m_{:03d}.mha".format(fn,len(metric_values))
+        sitk.WriteImage(moving, fn1)
+        fn1 = "{:s}_f_{:03d}.mha".format(fn,len(metric_values))
+        sitk.WriteImage(fixed, fn1)
+		"""
+		# Callback invoked by the IPython interact method for scrolling and modifying the alpha blending
+# of an image stack of two images that occupy the same physical space. 
+    def display_images_with_alpha(self, image_z, alpha, fixed, moving):
+        img = (1.0 - alpha)*fixed[:,:,image_z] + alpha*moving[:,:,image_z] 
+        plt.imshow(sitk.GetArrayViewFromImage(img),cmap=plt.cm.Greys_r);
+        plt.axis('off')
+        plt.show()
+	
         # Callback invoked when the StartEvent happens, sets up our new data.
     def start_plot(self):
         global metric_values, multires_iterations
@@ -44,9 +98,9 @@ class RegisterImages():
         
     # Callback invoked when the IterationEvent happens, update our data and display new figure.    
     def get_values(self, registration_method):
-        global metric_values, multires_iterations
+        #global metric_values, multires_iterations
         
-        metric_values.append(registration_method.GetMetricValue())                                       
+        #metric_values.append(registration_method.GetMetricValue())                                       
         print("RegisterImages: ",len(metric_values), registration_method.GetMetricValue())
         
     # Callback invoked when the sitkMultiResolutionIterationEvent happens, update the index into the 
@@ -55,7 +109,7 @@ class RegisterImages():
         global metric_values, multires_iterations
         multires_iterations.append(len(metric_values))   
             
-    def RegisterAffine(self, fixed_img, moving_img, initial_transf, idx = 0, debug=False):
+    def RegisterAffine(self, fixed_img, moving_img, initial_transf, idx = 0, debug=True):
         if debug:
             start_time = time.time()
             moving_resampled = sitk.Resample(moving_img, fixed_img,
@@ -67,15 +121,13 @@ class RegisterImages():
         self.moving = sitk.Cast(moving_img, sitk.sitkFloat32)
         
         self.initial_transform = initial_transf
-                                                             
-        
-
 
         registration_method = sitk.ImageRegistrationMethod()
-        registration_method.SetMetricAsMattesMutualInformation(numberOfHistogramBins=32)
+        #registration_method.SetMetricAsMattesMutualInformation(numberOfHistogramBins=32)
+        registration_method.SetMetricAsMeanSquares()
 
         registration_method.SetMetricSamplingStrategy(registration_method.RANDOM)
-        registration_method.SetMetricSamplingPercentage(0.01)
+        registration_method.SetMetricSamplingPercentage(0.05)
 
         registration_method.SetInterpolator(sitk.sitkLinear)
 
@@ -90,11 +142,7 @@ class RegisterImages():
         # Setup for the multi-resolution framework.            
         registration_method.SetShrinkFactorsPerLevel(shrinkFactors = [16,8,4])
         registration_method.SetSmoothingSigmasPerLevel(smoothingSigmas=[4,2,1])
-        #registration_method.SetShrinkFactorsPerLevel(shrinkFactors = [32,16,8,4])
-        #registration_method.SetSmoothingSigmasPerLevel(smoothingSigmas=[8,4,2,1])
         
-        #registration_method.SetShrinkFactorsPerLevel(shrinkFactors = [32,16,8])
-        #registration_method.SetSmoothingSigmasPerLevel(smoothingSigmas=[8,4,2])
         #
         # Uncomment these following 2lines for phantom study
         #
@@ -111,6 +159,10 @@ class RegisterImages():
             registration_method.AddCommand(sitk.sitkMultiResolutionIterationEvent, self.update_multires_iterations) 
             registration_method.AddCommand(sitk.sitkIterationEvent, lambda: self.get_values(registration_method))
             registration_method.AddCommand(sitk.sitkIterationEvent, lambda: self.plot_values(registration_method, '{:d}_plot.png'.format(idx)))
+            registration_method.AddCommand(sitk.sitkIterationEvent, 
+                lambda: self.display_images(sitk.GetArrayFromImage(self.fixed), 
+                self.fixed,
+                self.moving, registration_method,'{:d}_frame'.format(idx)))
        
         final_transform = registration_method.Execute(self.fixed, self.moving)
         

@@ -459,7 +459,7 @@ class PathologyVolume():
             
             
             length = len(self.pathologySlices)
-            middleIdx = int(length/2)
+            middleIdx = int(length/2)+1
             idxFixed = []
             idxMoving = []
             for i in range(middleIdx-1,length-1):
@@ -584,10 +584,10 @@ class PathologySlice():
             
     def getGrayFromRGB(self, im, invert=True):
         select  = sitk.VectorIndexSelectionCastImageFilter()
-        im_gray = select.Execute(im, 0, sitk.sitkUInt8)
-        im_gray +=select.Execute(im, 1, sitk.sitkUInt8)
-        im_gray +=select.Execute(im, 2, sitk.sitkUInt8)
-        im_gray /= 3
+        im_gray = select.Execute(im, 0, sitk.sitkUInt8)/3
+        im_gray +=select.Execute(im, 1, sitk.sitkUInt8)/3
+        im_gray +=select.Execute(im, 2, sitk.sitkUInt8)/3
+        #im_gray /= 3
         
         if invert:
             im_gray  = 255 - im_gray
@@ -744,7 +744,7 @@ class PathologySlice():
 
         try:    
             im_tr  = sitk.Resample(im, ref[:,:,self.refSliceIdx], self.transform,
-                sitk.sitkNearestNeighbor, 255)
+                sitk.sitkNearestNeighbor,255)
             ref_tr = sitk.JoinSeries(im_tr)
             ref    = sitk.Paste(ref, ref_tr, ref_tr.GetSize(), 
                 destinationIndex=[0,0,self.refSliceIdx])    
@@ -788,7 +788,8 @@ class PathologySlice():
                 destinationIndex=[0,0,self.refSliceIdx])
 
         return ref 
-    
+ 
+    """
     def registerTo(self, refPs, ref, applyTranf2Ref = True, idx = 0):
         if applyTranf2Ref:
             old = refPs.refSliceIdx
@@ -809,24 +810,7 @@ class PathologySlice():
         if self.doAffine:
             reg = RegisterImages()
             self.transform = reg.RegisterAffine(fixed_image, moving_image, self.transform, idx)
-        """
-        else:
-            # use moments, except if mask doesn't exist then use geometric
-            # no registration should be done, but at least align the data
-            try:
-                self.transform = sitk.CenteredTransformInitializer(
-                        sitk.Cast(fixed_image, sitk.sitkFloat32), 
-                        sitk.Cast(moving_image, sitk.sitkFloat32), 
-                        sitk.AffineTransform(moving_image.GetDimension()), 
-                        sitk.CenteredTransformInitializerFilter.MOMENTS)
-            except:
-                self.transform = sitk.CenteredTransformInitializer(
-                        sitk.Cast(fixed_image, sitk.sitkFloat32), 
-                        sitk.Cast(moving_image, sitk.sitkFloat32), 
-                        sitk.AffineTransform(moving_image.GetDimension()), 
-                        sitk.CenteredTransformInitializerFilter.GEOMETRY)
-        """    
-            
+      
             
     def registerToConstrait(self, fixed_image, refMov, refMovMask, ref, refMask, idx, applyTranf = True):  
         if applyTranf:
@@ -887,6 +871,83 @@ class PathologySlice():
             composite.AddTransform(self.transform)
             composite.AddTransform(transform)
             self.transform = composite
+
+        if self.doDeformable:
+            transform_def = reg.RegisterDeformable(fixed_image, moving_image, transform , 10, idx)
+            
+            composite = sitk.Transform(moving_image.GetDimension(), sitk.sitkComposite)
+            composite.AddTransform(self.transform)
+            composite.AddTransform(transform_def)
+            self.transform = composite
+    """
+    def registerTo(self, refPs, ref, applyTranf2Ref = True, idx=0):
+        if applyTranf2Ref:
+            old = refPs.refSliceIdx
+            refPs.refSliceIdx = self.refSliceIdx
+            fixed_image = refPs.setTransformedRgb(ref)[:,:,self.refSliceIdx]
+            refPs.refSliceIdx = old
+        else:
+            fixed_image = refPs.loadRgbImage()
+        
+        fixed_image  = self.getGrayFromRGB(fixed_image)
+        moving_image = self.loadRgbImage()
+        moving_image = self.getGrayFromRGB(moving_image)
+        
+        reg = RegisterImages()
+        self.transform = reg.RegisterAffine(fixed_image, moving_image, self.transform, idx)
+            
+            
+            
+            
+    def registerToConstrait(self, fixed_image, refMov, refMovMask, ref, refMask, idx, applyTranf = True):  
+        if applyTranf:
+            moving_image =  self.setTransformedRgb(refMov)[:,:,self.refSliceIdx]  
+        else:
+            moving_image = self.loadRgbImage()
+        
+        moving_image = self.getGrayFromRGB(moving_image)
+          
+        # if image has mask; use it!
+        try:
+            if applyTranf:
+                mask =  self.setTransformedMask(refMovMask,0)[:,:,self.refSliceIdx]  
+            else:
+                mask = self.loadMask(0)
+        except Exception as e:
+            print("No mask 0 was found")
+            mask = None
+        
+        if mask:
+            mask = sitk.Cast(sitk.Resample(mask, moving_image, sitk.Transform(), 
+                sitk.sitkNearestNeighbor, 0.0, moving_image.GetPixelID())>0,
+                moving_image.GetPixelID())
+            
+            moving_image = moving_image*mask
+            
+            
+        reg = RegisterImages()
+        
+        # use moments, except if mask doesn't exist then use geometric
+        try:
+            transform = sitk.CenteredTransformInitializer(
+                    sitk.Cast(fixed_image, sitk.sitkFloat32), 
+                    sitk.Cast(moving_image, sitk.sitkFloat32), 
+                    sitk.AffineTransform(moving_image.GetDimension()), 
+                    sitk.CenteredTransformInitializerFilter.MOMENTS)
+        except:
+            transform = sitk.CenteredTransformInitializer(
+                    sitk.Cast(fixed_image, sitk.sitkFloat32), 
+                    sitk.Cast(moving_image, sitk.sitkFloat32), 
+                    sitk.AffineTransform(moving_image.GetDimension()), 
+                    sitk.CenteredTransformInitializerFilter.GEOMETRY)
+            
+
+        transform = reg.RegisterAffine(fixed_image, moving_image, transform)
+        
+        composite = sitk.Transform(moving_image.GetDimension(), sitk.sitkComposite)
+        composite.AddTransform(self.transform)
+        composite.AddTransform(transform)
+        self.transform = composite
 
         if self.doDeformable:
             transform_def = reg.RegisterDeformable(fixed_image, moving_image, transform , 10, idx)
