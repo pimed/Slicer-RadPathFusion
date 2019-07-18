@@ -106,18 +106,15 @@ class PathologyVolume():
             else:
                 ps.refSliceIdx = len(self.pathologySlices)
             
-            #if self.noRegions < len(list(data[key]['regions'])):            
-            #    self.noRegions = len(list(data[key]['regions']))
             for r in list(data[key]['regions']):
                 if not r in self.regionIDs:
-                    #print("Adding region ", r)
                     self.regionIDs.append(r)
             self.noRegions = len(self.regionIDs)
-            #print("Done", self.noRegions)
-
+            
             # set the list with region ID so the slice know what ids to assign to
             # regions that are global
             ps.regionIDs = self.regionIDs
+            
             self.pathologySlices.append(ps)
   
   
@@ -164,7 +161,9 @@ class PathologyVolume():
     def setPath(self, path):
         self.path=path
 
-    def loadRgbVolume(self):      
+    def loadRgbVolume(self): 
+        if self.verbose:
+            print("Loading RGB")
         # create new volume with white background
         vol = sitk.Image(self.volumeSize, sitk.sitkVectorUInt8, 3)
         if self.volumeOrigin:
@@ -180,6 +179,8 @@ class PathologyVolume():
         # fill the volume
         # put ps.im in vol at index ps.idx
         for i, ps in enumerate(self.pathologySlices):
+            if self.verbose:
+                print("Loading slice", i)
             if not isSpacingSet:
                 im = ps.loadRgbImage()
             
@@ -196,7 +197,8 @@ class PathologyVolume():
             if not ps.refSize:
                 ps.setReference(vol) 
             #print("Rotate in sl",i, ps.doRotate, self.pathologySlices[i].doRotate)
-            vol = ps.setTransformedRgb(vol)
+            relativeIdx = int(i>0)
+            vol = ps.setTransformedRgb(vol, relativeIdx)
 
 
         if self.storeVolume:
@@ -236,7 +238,8 @@ class PathologyVolume():
             if not ps.refSize:
                 ps.setReference(vol)
  
-            vol = ps.setTransformedMask(vol, idxMask)
+            relativeIdx = int(i>0)
+            vol = ps.setTransformedMask(vol, idxMask, relativeIdx)
 
         return vol
         
@@ -410,7 +413,16 @@ class PathologyVolume():
         return imC, constraint_range
             
     def registerSlices(self, useImagingConstaint=False):
+    
+        
+        if not useImagingConstaint:
+            if (not self.doAffine and not self.doDeformable ):
+                print("Nothing to be done as no affine and no deformable were selected")
+                return
+        
         self.store_volume = True
+        ref = self.loadRgbVolume()
+        refMask = self.loadMask(0)
 
         ### if constraints are set, then use them and output the volume relative 
         ### to the constraint
@@ -427,13 +439,15 @@ class PathologyVolume():
                 print("No contraints will be used")
                 useImagingConstaint = False
                 return
-                
-            #sitk.WriteImage(imC, "fixed3D.nii.gz")
+            
                                 
-            ref = self.loadRgbVolume()
-            refMask = self.loadMask(0)
-            self.refWContraints     = ref
-            self.mskRefWContraints  = refMask
+
+            self.refWContraints     = self.loadRgbVolume()
+            self.mskRefWContraints  = self.loadMask(0)
+
+            if self.verbose:
+                sitk.WriteImage(imC, "fixed3D.nii.gz")
+                sitk.WriteImage(ref, "reference3D.nii.gz")
                 
             for imov in range(self.noSlices):
                 if imov >= len(constraint_range):
@@ -453,7 +467,6 @@ class PathologyVolume():
                     movPs.registerToConstrait(imC[:,:,ifix], self.refWoContraints,self.mskRefWoContraints, ref, refMask, ifix)
 
         else:
-            ref = self.loadRgbVolume()
             self.refWoContraints = ref
             self.mskRefWoContraints = self.loadMask(0)
             
@@ -478,7 +491,7 @@ class PathologyVolume():
                 fixPs = self.pathologySlices[ifix]
                 movPs = self.pathologySlices[imov]
                 movPs.doAffine      = self.doAffine
-                movPs.registerTo(fixPs,ref, True, 10+imov)
+                movPs.registerTo(fixPs, ref, refMask, True, 10+imov)
 
                 
     def deleteData(self):
@@ -587,8 +600,7 @@ class PathologySlice():
         im_gray = select.Execute(im, 0, sitk.sitkUInt8)/3
         im_gray +=select.Execute(im, 1, sitk.sitkUInt8)/3
         im_gray +=select.Execute(im, 2, sitk.sitkUInt8)/3
-        #im_gray /= 3
-        
+       
         if invert:
             im_gray  = 255 - im_gray
             
@@ -658,56 +670,72 @@ class PathologySlice():
         # when setting a new reference, the Transform needs to be recomputed
         self.transform = None
 
-    def computeCenterTransform(self, im, ref, mode = 0, doRotate=None, tranform_type = 0):
+    def computeCenterTransform(self, im, ref, relativeIdx=0, mode = 0, doRotate=None, tranform_type = 0):
         # 
         #Input
         #----
         #im:  sitk vector image - 2D RGB
         #ref: sitk vector image - 3D RGB
+        #relative IDX - if 0 - ref is the same index as as self, 
+        #                  1 - ref is one before
         #mode: int: 0 rgb, 1-grayscale
 
         #get first channel, needed for input of CenteredTransform
         if not mode:
             select = sitk.VectorIndexSelectionCastImageFilter()
-            im0  = select.Execute(im, 0, sitk.sitkUInt8)
+            im0  = select.Execute(im, 0, sitk.sitkUInt8)/3
+            im0  += select.Execute(im, 1, sitk.sitkUInt8)/3
+            im0  += select.Execute(im, 2, sitk.sitkUInt8)/3
+            
+            # since rgb also invert the intensities
+            im0 = 255-im0
             
             # if there are more slices in the exvivo than invivo
             try: 
-                ref0 = select.Execute(ref[:,:,self.refSliceIdx], 0, sitk.sitkUInt8)
+                ref0 = select.Execute(ref[:,:,self.refSliceIdx-relativeIdx], 0, sitk.sitkUInt8)/3
+                ref0 += select.Execute(ref[:,:,self.refSliceIdx-relativeIdx], 1, sitk.sitkUInt8)/3
+                ref0 += select.Execute(ref[:,:,self.refSliceIdx-relativeIdx], 2, sitk.sitkUInt8)/3
             except Exception as e:
                 print (e)
-                ref0 = select.Execute(ref[:,:,self.refSliceIdx-1], 0, sitk.sitkUInt8)
-
+                ref0 = select.Execute(ref[:,:,self.refSliceIdx-1], 0, sitk.sitkUInt8)/3
+                ref0 += select.Execute(ref[:,:,self.refSliceIdx-1], 1, sitk.sitkUInt8)/3
+                ref0 += select.Execute(ref[:,:,self.refSliceIdx-1], 2, sitk.sitkUInt8)/3
+            
+            ref0 = 255-ref0            
         else:
             im0 = im
             
             # if there are more slices in the exvivo than invivo
             try:
-                ref0 = ref[:,:,self.refSliceIdx]
+                ref0 = ref[:,:,self.refSliceIdx-relativeIdx]
             except Exception as e:
                 print (e)
                 ref0 = ref[:,:,self.refSliceIdx-1]
 
-
-        if tranform_type==0:
+        if self.verbose:
+            print("Computing Center of mass", self.refSliceIdx, np.max(sitk.GetArrayFromImage(im0)), 
+                np.min(sitk.GetArrayFromImage(ref0)), np.max(sitk.GetArrayFromImage(ref0)), doRotate)
+        
+        """
+        transform = None     
+        try:
+            tr = sitk.CenteredTransformInitializer(ref0, im0, 
+                sitk.AffineTransform(im.GetDimension()), 
+                sitk.CenteredTransformInitializerFilter.MOMENTS)
+            transform = sitk.AffineTransform(tr)    
+            print("Using COM")
+        except:
             tr = sitk.CenteredTransformInitializer(ref0, im0, 
                 sitk.AffineTransform(im.GetDimension()), 
                 sitk.CenteredTransformInitializerFilter.GEOMETRY)
-            self.transform = sitk.AffineTransform(tr)    
-        if tranform_type==1:
-            tr = sitk.CenteredTransformInitializer(ref0, im0, 
-                sitk.Similarity2DTransform(), 
-                sitk.CenteredTransformInitializerFilter.GEOMETRY)
-            self.transform = sitk.Similarity2DTransform(tr)    
-        else:
-            tr = sitk.CenteredTransformInitializer(ref0, im0, 
-                sitk.Euler2DTransform(), 
-                sitk.CenteredTransformInitializerFilter.GEOMETRY)
+            print("Using Geometric")
+            transform = sitk.AffineTransform(tr)    
+            
+        self.transform = sitk.Transform(transform)
+        """
         
-            self.transform = sitk.Euler2DTransform(tr)
-
-        #if doRotate:
-        if True:
+        #try to limit the numbers of transorms at this step, first rotate then translate
+        if doRotate:
             center = ref0.TransformContinuousIndexToPhysicalPoint(
                 np.array(ref0.GetSize())/2.0)
                 
@@ -719,18 +747,44 @@ class PathologySlice():
                 rotation.SetAngle(np.radians(doRotate))
                 
             rotation.SetCenter(center)
+            
+            #self.transform.AddTransform(rotation)
+            self.transform = sitk.Transform(rotation)
+            
+            #apply rotation
+            im0 = sitk.Resample(im0, ref0, self.transform)
+        else:
+            self.transform = None
+                 
+        # recompute centering
+        transform = None     
+        try:
+            tr = sitk.CenteredTransformInitializer(ref0, im0, 
+                sitk.AffineTransform(im.GetDimension()), 
+                sitk.CenteredTransformInitializerFilter.MOMENTS)
+            transform = sitk.AffineTransform(tr)
+            if self.verbose:
+                print("Using COM")
+        except:
+            tr = sitk.CenteredTransformInitializer(ref0, im0, 
+                sitk.AffineTransform(im.GetDimension()), 
+                sitk.CenteredTransformInitializerFilter.GEOMETRY)
+            if self.verbose:
+                print("Using Geometric")
+            transform = sitk.AffineTransform(tr)     
 
-            composite = sitk.Transform(im.GetDimension(), sitk.sitkComposite)
-            composite.AddTransform(self.transform)
-            composite.AddTransform(rotation)
-            self.transform = composite
+        if self.transform:
+            self.transform.AddTransform(transform)
+        else:
+            self.transform = sitk.Transform(transform)
+            
 
     def getFlipped(self, im):
         flipped_im = sitk.Flip(im, (False, True))
 
         return flipped_im 
 
-    def setTransformedRgb(self, ref):
+    def setTransformedRgb(self, ref, relativeIdx):
         im = self.loadRgbImage()
 
         #nothing was read
@@ -740,7 +794,10 @@ class PathologySlice():
         #print("Set Transformed image", self.doRotate)
 
         if not self.transform:
-            self.computeCenterTransform(im, ref, 0, self.doRotate)
+            self.computeCenterTransform(im, ref, relativeIdx, 0, self.doRotate)
+            
+            
+        #print(self.refSliceIdx, self.transform)
 
         try:    
             im_tr  = sitk.Resample(im, ref[:,:,self.refSliceIdx], self.transform,
@@ -760,7 +817,7 @@ class PathologySlice():
 
         return ref 
 
-    def setTransformedMask(self, ref, idxMask):
+    def setTransformedMask(self, ref, idxMask, relativeIdx):
         im = self.loadMask(idxMask)
         
         #nothing was read
@@ -768,7 +825,7 @@ class PathologySlice():
             return ref
 
         if not self.transform:
-            self.computeCenterTransform(im, ref, 1, self.doRotate)
+            self.computeCenterTransform(im, ref, relativeIdx, 1, self.doRotate)
        
         try:    
             im_tr  = sitk.Resample(im, ref[:,:,self.refSliceIdx], 
@@ -789,32 +846,72 @@ class PathologySlice():
 
         return ref 
  
-    """
-    def registerTo(self, refPs, ref, applyTranf2Ref = True, idx = 0):
+    def registerTo(self, refPs, ref, refMask, applyTranf2Ref = True, idx = 0):
         if applyTranf2Ref:
             old = refPs.refSliceIdx
             refPs.refSliceIdx = self.refSliceIdx
-            fixed_image = refPs.setTransformedRgb(ref)[:,:,self.refSliceIdx]
+            fixed_image = refPs.setTransformedRgb(ref, 1)[:,:,self.refSliceIdx]
             refPs.refSliceIdx = old
         else:
             fixed_image = refPs.loadRgbImage()
         
+        #sitk.WriteImage(refPs.setTransformedRgb(ref, 1),"{:02d}_Fixed.nii.gz".format(idx))
+        #sitk.WriteImage(refPs.setTransformedMask(refMask,0,1),"{:02d}_Fixed_mask.nii.gz".format(idx))
+        
         fixed_image  = self.getGrayFromRGB(fixed_image)
         moving_image = self.loadRgbImage()
         moving_image = self.getGrayFromRGB(moving_image)
-
+        
+        #apply mask to fixed image
+        try:
+            if applyTranf2Ref:
+                fixed_mask = refPs.setTransformedMask(refMask,0,1)[:,:,refPs.refSliceIdx]  
+            else:
+                fixed_mask = refPs.loadMask(0)
+        except Exception as e:
+            print("No mask 0 was found")
+            fixed_mask = None
+         
+        if fixed_mask:
+            fixed_mask = sitk.Cast(sitk.Resample(fixed_mask,fixed_image, sitk.Transform(), 
+                sitk.sitkNearestNeighbor, 0.0, fixed_image.GetPixelID())>0,
+                fixed_image.GetPixelID())
+                
+            #sitk.WriteImage(fixed_image,"{:02d}_Fixed_im1.nii.gz".format(idx))
+            #sitk.WriteImage(fixed_mask,"{:02d}_Fixed_mask1.nii.gz".format(idx))
+            fixed_image = fixed_image*fixed_mask
+            
+            
+            
+        #apply mask to moving image
+        try:
+            moving_mask = self.loadMask(0)
+        except Exception as e:
+            print("No mask 0 was found")
+            moving_mask = None
+         
+        if moving_mask:
+            moving_mask = sitk.Cast(sitk.Resample(moving_mask, moving_image, sitk.Transform(), 
+                sitk.sitkNearestNeighbor, 0.0, moving_image.GetPixelID())>0,
+                moving_image.GetPixelID())
+                
+            #sitk.WriteImage(moving_image,"{:02d}_Moving_im.nii.gz".format(idx))
+            #sitk.WriteImage(moving_mask,"{:02d}_Moving_mask.nii.gz".format(idx))                
+            moving_image = moving_image*moving_mask
+        
+        
         if self.verbose:
             print("PathologySlice: Do no constraints affine:",self.doAffine)
             print("PathologySlice: Do no constraints deformable:",self.doDeformable)
         
         if self.doAffine:
             reg = RegisterImages()
-            self.transform = reg.RegisterAffine(fixed_image, moving_image, self.transform, idx)
+            self.transform = reg.RegisterAffine(fixed_image, moving_image, self.transform, idx, 1)
       
             
     def registerToConstrait(self, fixed_image, refMov, refMovMask, ref, refMask, idx, applyTranf = True):  
         if applyTranf:
-            moving_image =  self.setTransformedRgb(refMov)[:,:,self.refSliceIdx]  
+            moving_image =  self.setTransformedRgb(ref, 0)[:,:,self.refSliceIdx]  
         else:
             moving_image = self.loadRgbImage()
         
@@ -823,7 +920,7 @@ class PathologySlice():
         # if image has mask; use it!
         try:
             if applyTranf:
-                mask =  self.setTransformedMask(refMovMask,0)[:,:,self.refSliceIdx]  
+                mask =  self.setTransformedMask(refMask,0,0)[:,:,self.refSliceIdx]  
             else:
                 mask = self.loadMask(0)
         except Exception as e:
@@ -837,14 +934,16 @@ class PathologySlice():
             
             moving_image = moving_image*mask
             
-        #sitk.WriteImage(moving_resampled,'moving_first_{:d}.mha'.format(idx))    
-        reg = RegisterImages()
         
+        if self.verbose:
+            sitk.WriteImage(fixed_image,"{:02d}_Center_Fixed.nii.gz".format(idx))
+            sitk.WriteImage(moving_image,"{:02d}_Center_Moving.nii.gz".format(idx))
+
         # use moments, except if mask doesn't exist then use geometric
         try:
             transform = sitk.CenteredTransformInitializer(
-                    sitk.Cast(fixed_image, sitk.sitkFloat32), 
-                    sitk.Cast(moving_image, sitk.sitkFloat32), 
+                    sitk.Cast(fixed_image>0, sitk.sitkFloat32), 
+                    sitk.Cast(moving_image>0, sitk.sitkFloat32),
                     sitk.AffineTransform(moving_image.GetDimension()), 
                     sitk.CenteredTransformInitializerFilter.MOMENTS)
         except:
@@ -854,69 +953,23 @@ class PathologySlice():
                     sitk.AffineTransform(moving_image.GetDimension()), 
                     sitk.CenteredTransformInitializerFilter.GEOMETRY)
 
-        if not self.doAffine and not self.doDeformable:
-            composite = sitk.Transform(moving_image.GetDimension(), sitk.sitkComposite)
-            composite.AddTransform(self.transform)
-            composite.AddTransform(transform)
-            self.transform = composite
+        # if affine and deformable are not done, then just center. 
+        #if not self.doAffine and not self.doDeformable:
+        # center by COM
+        self.transform.AddTransform(transform)
+            
         
         if self.verbose:
             print("PathologySlice: Do constraints affine:",self.doAffine)
             print("PathologySlice: Do constraints deformable:",self.doDeformable)
-
-        if self.doAffine:
-            transform = reg.RegisterAffine(fixed_image, moving_image, transform, idx)
             
-            composite = sitk.Transform(moving_image.GetDimension(), sitk.sitkComposite)
-            composite.AddTransform(self.transform)
-            composite.AddTransform(transform)
-            self.transform = composite
-
-        if self.doDeformable:
-            transform_def = reg.RegisterDeformable(fixed_image, moving_image, transform , 10, idx)
-            
-            composite = sitk.Transform(moving_image.GetDimension(), sitk.sitkComposite)
-            composite.AddTransform(self.transform)
-            composite.AddTransform(transform_def)
-            self.transform = composite
-    """
-    def registerTo(self, refPs, ref, applyTranf2Ref = True, idx=0):
-        if applyTranf2Ref:
-            old = refPs.refSliceIdx
-            refPs.refSliceIdx = self.refSliceIdx
-            fixed_image = refPs.setTransformedRgb(ref)[:,:,self.refSliceIdx]
-            refPs.refSliceIdx = old
-        else:
-            fixed_image = refPs.loadRgbImage()
+        reg = RegisterImages()
         
-        fixed_image  = self.getGrayFromRGB(fixed_image)
+        # reload moving, without transform, so the transform gets to be identified in the affine registration
+        # starting with the COM alignment. 
         moving_image = self.loadRgbImage()
         moving_image = self.getGrayFromRGB(moving_image)
-        
-        reg = RegisterImages()
-        self.transform = reg.RegisterAffine(fixed_image, moving_image, self.transform, idx)
-            
-            
-            
-            
-    def registerToConstrait(self, fixed_image, refMov, refMovMask, ref, refMask, idx, applyTranf = True):  
-        if applyTranf:
-            moving_image =  self.setTransformedRgb(refMov)[:,:,self.refSliceIdx]  
-        else:
-            moving_image = self.loadRgbImage()
-        
-        moving_image = self.getGrayFromRGB(moving_image)
-          
-        # if image has mask; use it!
-        try:
-            if applyTranf:
-                mask =  self.setTransformedMask(refMovMask,0)[:,:,self.refSliceIdx]  
-            else:
-                mask = self.loadMask(0)
-        except Exception as e:
-            print("No mask 0 was found")
-            mask = None
-        
+        mask = self.loadMask(0)
         if mask:
             mask = sitk.Cast(sitk.Resample(mask, moving_image, sitk.Transform(), 
                 sitk.sitkNearestNeighbor, 0.0, moving_image.GetPixelID())>0,
@@ -924,38 +977,22 @@ class PathologySlice():
             
             moving_image = moving_image*mask
             
-            
-        reg = RegisterImages()
-        
-        # use moments, except if mask doesn't exist then use geometric
-        try:
-            transform = sitk.CenteredTransformInitializer(
-                    sitk.Cast(fixed_image, sitk.sitkFloat32), 
-                    sitk.Cast(moving_image, sitk.sitkFloat32), 
-                    sitk.AffineTransform(moving_image.GetDimension()), 
-                    sitk.CenteredTransformInitializerFilter.MOMENTS)
-        except:
-            transform = sitk.CenteredTransformInitializer(
-                    sitk.Cast(fixed_image, sitk.sitkFloat32), 
-                    sitk.Cast(moving_image, sitk.sitkFloat32), 
-                    sitk.AffineTransform(moving_image.GetDimension()), 
-                    sitk.CenteredTransformInitializerFilter.GEOMETRY)
-            
-
-        transform = reg.RegisterAffine(fixed_image, moving_image, transform)
-        
-        composite = sitk.Transform(moving_image.GetDimension(), sitk.sitkComposite)
-        composite.AddTransform(self.transform)
-        composite.AddTransform(transform)
-        self.transform = composite
+        if self.verbose:
+            moved_image = sitk.Resample(moving_image, fixed_image,
+                self.transform, sitk.sitkLinear, 0.0, fixed_image.GetPixelID())
+            sitk.WriteImage(moved_image,"{:02d}_Center_Moved.nii.gz".format(idx))
+ 
+        if self.doAffine:
+            self.transform = reg.RegisterAffine(sitk.Cast(fixed_image>0, sitk.sitkFloat32)*255, 
+                sitk.Cast(moving_image>0, sitk.sitkFloat32)*255, self.transform, idx, 0, 0, True, False)
+            #self.transform = reg.RegisterAffine(fixed_image,moving_image, self.transform, idx, 0, 1, True, False)
+            #self.transform = reg.RegisterAffine(sitk.Cast(fixed_image, sitk.sitkFloat32)/np.max(sitk.GetArrayFromImage(fixed_image))*255, 
+            #    sitk.Cast(moving_image, sitk.sitkFloat32)/np.max(sitk.GetArrayFromImage(moving_image))*255,
+            #    self.transform, idx, 0, 0, True, False)
 
         if self.doDeformable:
-            transform_def = reg.RegisterDeformable(fixed_image, moving_image, transform , 10, idx)
-            
-            composite = sitk.Transform(moving_image.GetDimension(), sitk.sitkComposite)
-            composite.AddTransform(self.transform)
-            composite.AddTransform(transform_def)
-            self.transform = composite
+            transform_def = reg.RegisterDeformable(fixed_image, moving_image, self.transform, 10, idx)
+            self.transform.AddTransform(transform_def)
 
     def deleteData(self):
         print("Deleting Slice")
