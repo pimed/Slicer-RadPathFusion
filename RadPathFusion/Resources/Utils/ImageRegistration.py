@@ -1,9 +1,5 @@
 import SimpleITK as sitk
 import numpy as np
-import matplotlib.pyplot as plt
-import time
-from ipywidgets import interact, fixed
-
         
 class RegisterImages():
     def __init__(self):
@@ -16,6 +12,7 @@ class RegisterImages():
     def display_images(self, fixed_npa, fixed, moving, registration_method, fn):
         # Create a figure with two subplots and the specified size.
         #global metric_values
+        import matplotlib.pyplot as plt
         plt.subplots(1,2,figsize=(10,8))
 		
         # Draw the fixed image in the first subplot.
@@ -83,6 +80,7 @@ class RegisterImages():
         del metric_values
         del multires_iterations
         # Close figure, we don't want to get a duplicate of the plot latter on.
+        import matplotlib.pyplot as plt
         plt.close()
 
     # Callback invoked when the IterationEvent happens, update our data and display new figure.    
@@ -91,6 +89,7 @@ class RegisterImages():
         
         metric_values.append(registration_method.GetMetricValue())                                       
         # Plot the similarity metric values
+        import matplotlib.pyplot as plt
         plt.plot(metric_values, 'r')
         plt.plot(multires_iterations, [metric_values[index] for index in multires_iterations], 'b*')
         plt.xlabel('Iteration Number',fontsize=12)
