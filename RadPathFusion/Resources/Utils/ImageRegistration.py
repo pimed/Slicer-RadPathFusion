@@ -27,7 +27,10 @@ class RegisterImages():
         print(registration_method.GetCurrentLevel(), np.min(fixed_npa),np.max(fixed_npa))
         #get_current_transform
         current_transform = sitk.Transform(registration_method.GetInitialTransform())
+        print(current_transform)
+        print(registration_method.GetOptimizerPosition())
         current_transform.SetParameters(registration_method.GetOptimizerPosition())
+        print(current_transform)
         
         moving = sitk.Resample(moving,fixed, current_transform)
         moving_npa = sitk.GetArrayFromImage(moving)
@@ -101,7 +104,8 @@ class RegisterImages():
         #global metric_values, multires_iterations
         
         #metric_values.append(registration_method.GetMetricValue())                                       
-        print("RegisterImages: ",len(metric_values), registration_method.GetMetricValue())
+        print("RegisterImages: ",len(metric_values), registration_method.GetMetricValue(),
+            registration_method.GetOptimizerPosition(), registration_method.GetOptimizerScales())
         
     # Callback invoked when the sitkMultiResolutionIterationEvent happens, update the index into the 
     # metric_values list. 
@@ -109,22 +113,40 @@ class RegisterImages():
         global metric_values, multires_iterations
         multires_iterations.append(len(metric_values))   
             
-    def RegisterAffine(self, fixed_img, moving_img, initial_transf, idx = 0, debug=True):
+    def RegisterAffine(self, fixed_img, moving_img, initial_transf, idx = 0, 
+        mode = 0, mode_score=0, apply_tr=False, debug=False):
         if debug:
             start_time = time.time()
             moving_resampled = sitk.Resample(moving_img, fixed_img,
                 initial_transf, sitk.sitkLinear, 0.0, fixed_img.GetPixelID())
-            sitk.WriteImage(moving_resampled,'{:d}_moving.mha'.format(idx))
-            sitk.WriteImage(fixed_img,'{:d}_fixed.mha'.format(idx))
+            sitk.WriteImage(moving_resampled,'{:d}_moving.nii.gz'.format(idx))
+            sitk.WriteImage(fixed_img,'{:d}_fixed.nii.gz'.format(idx))
+        
+        if not apply_tr:
+            if mode==1: # do rigid
+                initial_transf.AddTransform(sitk.Euler2DTransform())    
+            else:
+                initial_transf.AddTransform(sitk.AffineTransform(2))    
+        else:
+            moving_img = sitk.Resample(moving_img, fixed_img,
+                initial_transf, sitk.sitkLinear, 0.0, fixed_img.GetPixelID())
+            output_tr = initial_transf
+            initial_transf = sitk.AffineTransform(2)
             
+        
         self.fixed  = sitk.Cast(fixed_img, sitk.sitkFloat32)
         self.moving = sitk.Cast(moving_img, sitk.sitkFloat32)
         
-        self.initial_transform = initial_transf
 
         registration_method = sitk.ImageRegistrationMethod()
-        #registration_method.SetMetricAsMattesMutualInformation(numberOfHistogramBins=32)
-        registration_method.SetMetricAsMeanSquares()
+        if mode_score==0:
+            registration_method.SetMetricAsMeanSquares()
+            if debug:
+                print("Use mse")
+        else:
+            registration_method.SetMetricAsMattesMutualInformation(numberOfHistogramBins=32)
+            if debug:
+                print("Use mutual information")
 
         registration_method.SetMetricSamplingStrategy(registration_method.RANDOM)
         registration_method.SetMetricSamplingPercentage(0.05)
@@ -133,15 +155,25 @@ class RegisterImages():
 
 
         # Optimizer settings.
-        #registration_method.SetOptimizerAsGradientDescent(learningRate=.2, 
-        #    numberOfIterations=250, convergenceMinimumValue=1e-4, convergenceWindowSize=30)
-        registration_method.SetOptimizerAsGradientDescent(learningRate=.1, 
-            numberOfIterations=100, convergenceMinimumValue=1e-6, convergenceWindowSize=10)
+        registration_method.SetOptimizerAsGradientDescent(learningRate=0.1, 
+            numberOfIterations=250, convergenceMinimumValue=1e-4, convergenceWindowSize=50)
         #registration_method.SetOptimizerScalesFromPhysicalShift()
+        if mode==0: #affine + mse
+            registration_method.SetOptimizerScales([2000,2000,2000,2000,1,1])
+        elif mode==1: # do rigid + mse
+            registration_method.SetOptimizerScales([2000,1,1])
+        else: # affine+mi
+            registration_method.SetOptimizerScales([100,100,100,100,1,1])
+            
+
 
         # Setup for the multi-resolution framework.            
         registration_method.SetShrinkFactorsPerLevel(shrinkFactors = [16,8,4])
         registration_method.SetSmoothingSigmasPerLevel(smoothingSigmas=[4,2,1])
+
+        #registration_method.SetShrinkFactorsPerLevel(shrinkFactors = [1])
+        #registration_method.SetSmoothingSigmasPerLevel(smoothingSigmas=[1])
+
         
         #
         # Uncomment these following 2lines for phantom study
@@ -151,7 +183,7 @@ class RegisterImages():
         registration_method.SmoothingSigmasAreSpecifiedInPhysicalUnitsOff()
 
         # Don't optimize in-place, we would possibly like to run this cell multiple times.
-        registration_method.SetInitialTransform(self.initial_transform, inPlace=False)
+        registration_method.SetInitialTransform(initial_transf, inPlace=False)
         
         if debug:
             registration_method.AddCommand(sitk.sitkStartEvent, self.start_plot)
@@ -159,29 +191,37 @@ class RegisterImages():
             registration_method.AddCommand(sitk.sitkMultiResolutionIterationEvent, self.update_multires_iterations) 
             registration_method.AddCommand(sitk.sitkIterationEvent, lambda: self.get_values(registration_method))
             registration_method.AddCommand(sitk.sitkIterationEvent, lambda: self.plot_values(registration_method, '{:d}_plot.png'.format(idx)))
-            registration_method.AddCommand(sitk.sitkIterationEvent, 
-                lambda: self.display_images(sitk.GetArrayFromImage(self.fixed), 
-                self.fixed,
-                self.moving, registration_method,'{:d}_frame'.format(idx)))
+            #registration_method.AddCommand(sitk.sitkIterationEvent, 
+            #    lambda: self.display_images(sitk.GetArrayFromImage(self.fixed), 
+            #    self.fixed,
+            #    self.moving, registration_method,'{:d}_frame'.format(idx)))
        
         final_transform = registration_method.Execute(self.fixed, self.moving)
         
         if debug:
+            print ("Initial transform", self.initial_transform )
+            print ("Optimized transform", final_transform )
+            print ("Optimized transform", final_transform.FlattenTransform() )
+        
+
             print('RegisterImages: Final metric value: {0}'.format(registration_method.GetMetricValue()))
             print('RegisterImages: Optimizer\'s stopping condition, {0}'.format(registration_method.GetOptimizerStopConditionDescription()))
-
-        if debug:
+            
             end_time = time.time()
-            print(final_transform)
             moving_resampled = sitk.Resample(self.moving, self.fixed,
                 final_transform, sitk.sitkLinear, 0.0, moving_img.GetPixelID())
-            sitk.WriteImage(moving_resampled,'{:d}_moved.mha'.format(idx))
+            sitk.WriteImage(moving_resampled,'{:d}_moved.nii.gz'.format(idx))
             print("RegisterImages: Done Running Affine Registration in", (end_time-start_time)/60, "(min)")
 
         if self.verbose: 
             print("RegisterImages: Done Running Affine Registration!")
-            
-        return final_transform
+        
+        #only add the last Affine
+        if apply_tr:
+            output_tr.AddTransform(final_transform)
+            return output_tr
+        else:
+            return final_transform
 
     def RegisterDeformable(self, fixed_img, moving_img, initial_transf, dist_between_grid_points = 10, idx = 0, debug=False):
         """
