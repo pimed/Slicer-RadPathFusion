@@ -46,6 +46,8 @@ class PathologyVolume():
         self.mskRefWContraints  = None
         self.doAffine           = True
         self.doDeformable       = None
+        self.doReconstruct      = None
+        self.fastExecution      = None
 
         self.successfulInitialization = False;
     
@@ -419,20 +421,25 @@ class PathologyVolume():
             if (not self.doAffine and not self.doDeformable ):
                 print("Nothing to be done as no affine and no deformable were selected")
                 return
+        print("Reconstruct?", self.doReconstruct)
         
         self.store_volume = True
-        ref = self.loadRgbVolume()
-        refMask = self.loadMask(0)
 
         ### if constraints are set, then use them and output the volume relative 
         ### to the constraint
         if useImagingConstaint:
+            print("Reading Input data...")
+            ref = self.loadRgbVolume()
+            refMask = self.loadMask(0)
+            import time
+            start_input_time = time.time()
             if (self.imagingContraintFilename and self.imagingContraintMaskFilename) or (self.imagingContraint and self.imagingContraintMask):
                 imC, constraint_range = self.getConstraint()
                 self.volumeSize         = imC.GetSize()
+                self.volumeSpacing      = imC.GetSpacing()
+
                 self.volumeOrigin       = imC.GetOrigin()
                 self.volumeDirection    = imC.GetDirection()
-                self.volumeSpacing      = imC.GetSpacing()
             else:
                 print("Using Imaging Constraints was set, but no filenames were set")
                 print("set magingContraintFilename and imagingContraintMaskFilename")
@@ -440,10 +447,18 @@ class PathologyVolume():
                 useImagingConstaint = False
                 return
             
-                                
-
+            #FIXME: does ref needs to be loaded 2 times, 
+            # test whether one gets similar results with only one load
+            # is faster
+            
+            
             self.refWContraints     = self.loadRgbVolume()
             self.mskRefWContraints  = self.loadMask(0)
+            end_input_time = time.time()
+            print("Done in ", (end_input_time-start_input_time)/60 , "min")
+            
+
+ 
 
             if self.verbose:
                 sitk.WriteImage(imC, "fixed3D.nii.gz")
@@ -453,45 +468,57 @@ class PathologyVolume():
                 if imov >= len(constraint_range):
                     break
                 ifix = constraint_range[imov]
+                start_reg_time = time.time()
                 print("----Refine slice to imaging constraint", imov, ifix, "------")
                 movPs = self.pathologySlices[imov]
                 movPs.doAffine      = self.doAffine
                 movPs.doDeformable  = self.doDeformable
+                movPs.fastExecution = self.fastExecution
                         
-                print("Do affine 1:",movPs.doAffine)
-                print("Do deformable 1:",movPs.doDeformable)
+                #print("Do affine 1:    ",movPs.doAffine)
+                #print("Do deformable 1:",movPs.doDeformable)
+                #print("Run fast 1:     ",movPs.fastExecution)
 
                 if self.refWoContraints == None or  self.mskRefWContraints==None:
                     movPs.registerToConstrait(imC[:,:,ifix], self.refWContraints,self.mskRefWContraints, ref, refMask, ifix)
                 else:
                     movPs.registerToConstrait(imC[:,:,ifix], self.refWoContraints,self.mskRefWoContraints, ref, refMask, ifix)
-
+                end_reg_time = time.time()
+                print("Done registration in ", (end_reg_time-start_reg_time)/60, "min")
         else:
-            self.refWoContraints = ref
-            self.mskRefWoContraints = self.loadMask(0)
-            
-            
-            length = len(self.pathologySlices)
-            middleIdx = int(length/2)+1
-            idxFixed = []
-            idxMoving = []
-            for i in range(middleIdx-1,length-1):
-                idxFixed.append(i)
-                idxMoving.append(i+1)
-            for i in range(middleIdx-1, 0, -1):
-                idxFixed.append(i)
-                idxMoving.append(i-1)
-            
-            #print(idxFixed)
-            #print(idxMoving)
-            
-            ### register consecutive histology slices
-            for ifix,imov in zip(idxFixed,idxMoving):
-                print("----Registering slices", ifix, imov, "------")
-                fixPs = self.pathologySlices[ifix]
-                movPs = self.pathologySlices[imov]
-                movPs.doAffine      = self.doAffine
-                movPs.registerTo(fixPs, ref, refMask, True, 10+imov)
+        
+            if self.fastExecution:
+                print("Fast execution: Pathology reconstruction is not performed")
+                return
+            if self.doReconstruct:
+                ref = self.loadRgbVolume()
+                refMask = self.loadMask(0)
+
+                self.refWoContraints = ref
+                self.mskRefWoContraints = self.loadMask(0)
+                
+                
+                length = len(self.pathologySlices)
+                middleIdx = int(length/2)+1
+                idxFixed = []
+                idxMoving = []
+                for i in range(middleIdx-1,length-1):
+                    idxFixed.append(i)
+                    idxMoving.append(i+1)
+                for i in range(middleIdx-1, 0, -1):
+                    idxFixed.append(i)
+                    idxMoving.append(i-1)
+                
+                #print(idxFixed)
+                #print(idxMoving)
+                
+                ### register consecutive histology slices
+                for ifix,imov in zip(idxFixed,idxMoving):
+                    print("----Registering slices", ifix, imov, "------")
+                    fixPs = self.pathologySlices[ifix]
+                    movPs = self.pathologySlices[imov]
+                    movPs.doAffine      = self.doAffine
+                    movPs.registerTo(fixPs, ref, refMask, True, 10+imov)
 
                 
     def deleteData(self):
@@ -529,6 +556,7 @@ class PathologySlice():
         self.regionIDs      = None
         self.doAffine       = True
         self.doDeformable   = None
+        self.fastExecution  = None
         
 
     def loadImageSize(self):
@@ -962,6 +990,7 @@ class PathologySlice():
         if self.verbose:
             print("PathologySlice: Do constraints affine:",self.doAffine)
             print("PathologySlice: Do constraints deformable:",self.doDeformable)
+            print("PathologySlice: Fast execution:",self.fastExecution)
             
         reg = RegisterImages()
         
@@ -982,17 +1011,50 @@ class PathologySlice():
                 self.transform, sitk.sitkLinear, 0.0, fixed_image.GetPixelID())
             sitk.WriteImage(moved_image,"{:02d}_Center_Moved.nii.gz".format(idx))
  
+        
+        #import time
+        #start_time = time.time()
+        
+        if self.fastExecution:
+            r = 4
+            newSize = [int(fixed_image.GetSize()[0]/r),int(fixed_image.GetSize()[1]/r)]
+            newSp = [fixed_image.GetSpacing()[0]*r,fixed_image.GetSpacing()[0]*r]
+            refRegImg = sitk.Image(newSize, sitk.sitkFloat32)
+            refRegImg.SetSpacing(newSp)
+            refRegImg.SetDirection(fixed_image.GetDirection())
+            refRegImg.SetOrigin(fixed_image.GetOrigin())
+            fixed_image = sitk.Resample(fixed_image, refRegImg, sitk.Transform())
+ 
         if self.doAffine:
-            self.transform = reg.RegisterAffine(sitk.Cast(fixed_image>0, sitk.sitkFloat32)*255, 
-                sitk.Cast(moving_image>0, sitk.sitkFloat32)*255, self.transform, idx, 0, 0, True, False)
-            #self.transform = reg.RegisterAffine(fixed_image,moving_image, self.transform, idx, 0, 1, True, False)
-            #self.transform = reg.RegisterAffine(sitk.Cast(fixed_image, sitk.sitkFloat32)/np.max(sitk.GetArrayFromImage(fixed_image))*255, 
-            #    sitk.Cast(moving_image, sitk.sitkFloat32)/np.max(sitk.GetArrayFromImage(moving_image))*255,
-            #    self.transform, idx, 0, 0, True, False)
+            fixed_image_input = sitk.Cast(fixed_image>0, sitk.sitkFloat32)*255
+            moving_image_input = sitk.Cast(moving_image>0, sitk.sitkFloat32)*255
+            
+            #time1 = time.time()
+            self.transform = reg.RegisterAffine(fixed_image_input, moving_image_input, self.transform, idx, 1, 0, True, False)
+            #time2 = time.time()
+            self.transform = reg.RegisterAffine(fixed_image_input, moving_image_input, self.transform, idx, 1, 0, True, False)
+            #time3 = time.time()
+            self.transform = reg.RegisterAffine(fixed_image_input, moving_image_input, self.transform, idx, 0, 0, True, False)
+            #time4 = time.time()
 
+
+        
+        #time5 = time.time()
         if self.doDeformable:
             transform_def = reg.RegisterDeformable(fixed_image, moving_image, self.transform, 10, idx)
             self.transform.AddTransform(transform_def)
+            
+        #end_time = time.time()
+        
+        """
+        print("Rigid1      : {:6.3f} {:6.3f}".format((time2-time1)/60, 100*(time2-time1)/(end_time-start_time)))
+        print("Rigid2      : {:6.3f} {:6.3f}".format((time3-time2)/60, 100*(time3-time2)/(end_time-start_time)))
+        print("Affine1     : {:6.3f} {:6.3f}\n".format((time4-time3)/60, 100*(time4-time3)/(end_time-start_time)))
+        
+        print("Affine      : {:6.3f} {:6.3f}".format((time5-time1)/60, 100*(time5-time1)/(end_time-start_time)))
+        print("Deformable1 : {:6.3f} {:6.3f}".format((end_time-time5)/60, 100*(end_time-time5)/(end_time-start_time)))
+        print("Registration: {:6.3f}".format((end_time-start_time)/60))
+        """
 
     def deleteData(self):
         print("Deleting Slice")
