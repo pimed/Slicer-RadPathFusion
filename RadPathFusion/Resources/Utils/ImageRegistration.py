@@ -115,11 +115,14 @@ class RegisterImages():
     def RegisterAffine(self, fixed_img, moving_img, initial_transf, idx = 0, 
         mode = 0, mode_score=0, apply_tr=False, debug=False):
         if debug:
+            import time
             start_time = time.time()
             moving_resampled = sitk.Resample(moving_img, fixed_img,
                 initial_transf, sitk.sitkLinear, 0.0, fixed_img.GetPixelID())
             sitk.WriteImage(moving_resampled,'{:d}_moving.nii.gz'.format(idx))
             sitk.WriteImage(fixed_img,'{:d}_fixed.nii.gz'.format(idx))
+            
+            print("mode_Tra:", mode, "\nMode_score", mode_score, "\nApply Transofrm", apply_tr)
         
         if not apply_tr:
             if mode==1: # do rigid
@@ -130,7 +133,10 @@ class RegisterImages():
             moving_img = sitk.Resample(moving_img, fixed_img,
                 initial_transf, sitk.sitkLinear, 0.0, fixed_img.GetPixelID())
             output_tr = initial_transf
-            initial_transf = sitk.AffineTransform(2)
+            if mode==1: # do rigid
+                initial_transf = sitk.Euler2DTransform() 
+            else:
+                initial_transf = sitk.AffineTransform(2)
             
         
         self.fixed  = sitk.Cast(fixed_img, sitk.sitkFloat32)
@@ -149,13 +155,15 @@ class RegisterImages():
 
         registration_method.SetMetricSamplingStrategy(registration_method.RANDOM)
         registration_method.SetMetricSamplingPercentage(0.05)
-
         registration_method.SetInterpolator(sitk.sitkLinear)
 
 
         # Optimizer settings.
-        registration_method.SetOptimizerAsGradientDescent(learningRate=0.1, 
-            numberOfIterations=250, convergenceMinimumValue=1e-4, convergenceWindowSize=50)
+        nIterations = 250
+        convergenceWindowSize = 50
+        
+        registration_method.SetOptimizerAsGradientDescent(learningRate=0.01, #changed learning rate from 0.1 to 0.01
+            numberOfIterations=nIterations, convergenceMinimumValue=1e-4, convergenceWindowSize=convergenceWindowSize)
         #registration_method.SetOptimizerScalesFromPhysicalShift()
         if mode==0: #affine + mse
             registration_method.SetOptimizerScales([2000,2000,2000,2000,1,1])
@@ -166,19 +174,8 @@ class RegisterImages():
             
 
 
-        # Setup for the multi-resolution framework.            
         registration_method.SetShrinkFactorsPerLevel(shrinkFactors = [16,8,4])
         registration_method.SetSmoothingSigmasPerLevel(smoothingSigmas=[4,2,1])
-
-        #registration_method.SetShrinkFactorsPerLevel(shrinkFactors = [1])
-        #registration_method.SetSmoothingSigmasPerLevel(smoothingSigmas=[1])
-
-        
-        #
-        # Uncomment these following 2lines for phantom study
-        #
-        #registration_method.SetShrinkFactorsPerLevel(shrinkFactors = [2,1])
-        #registration_method.SetSmoothingSigmasPerLevel(smoothingSigmas=[2,1])
         registration_method.SmoothingSigmasAreSpecifiedInPhysicalUnitsOff()
 
         # Don't optimize in-place, we would possibly like to run this cell multiple times.
@@ -196,6 +193,7 @@ class RegisterImages():
             #    self.moving, registration_method,'{:d}_frame'.format(idx)))
        
         final_transform = registration_method.Execute(self.fixed, self.moving)
+        #print('RegisterImages: Optimizer\'s stopping condition, {0}'.format(registration_method.GetOptimizerStopConditionDescription()))
         
         if debug:
             print ("Initial transform", self.initial_transform )
@@ -221,6 +219,7 @@ class RegisterImages():
             return output_tr
         else:
             return final_transform
+
 
     def RegisterDeformable(self, fixed_img, moving_img, initial_transf, dist_between_grid_points = 10, idx = 0, debug=False):
         """
@@ -249,7 +248,6 @@ class RegisterImages():
             sitk.WriteImage(self.fixed,'fixed_deformable_{:d}.mha'.format(idx))
 
         registration_method = sitk.ImageRegistrationMethod()
-        #registration_method.SetMetricAsMeanSquares()
         registration_method.SetMetricAsMattesMutualInformation(numberOfHistogramBins=32)
         
         registration_method.SetMetricSamplingStrategy(registration_method.RANDOM)
@@ -258,12 +256,16 @@ class RegisterImages():
         registration_method.SetInterpolator(sitk.sitkLinear)
 
 
+        
+        nIterations = 10
+
         # Optimizer settings.
-        registration_method.SetOptimizerAsLBFGSB(gradientConvergenceTolerance=1e-5, numberOfIterations=10)
+        registration_method.SetOptimizerAsLBFGSB(gradientConvergenceTolerance=1e-5, numberOfIterations=nIterations)
         #registration_method.SetOptimizerAsGradientDescent(learningRate=.1, numberOfIterations=100, convergenceMinimumValue=1e-6, convergenceWindowSize=10)
         #registration_method.SetOptimizerScalesFromPhysicalShift()
 
         # Setup for the multi-resolution framework.            
+
         registration_method.SetShrinkFactorsPerLevel(shrinkFactors = [16,8,4])
         registration_method.SetSmoothingSigmasPerLevel(smoothingSigmas=[4,2,1])
         registration_method.SmoothingSigmasAreSpecifiedInPhysicalUnitsOff()
