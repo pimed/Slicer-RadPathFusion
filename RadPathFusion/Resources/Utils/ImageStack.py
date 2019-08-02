@@ -144,6 +144,17 @@ class PathologyVolume():
 
 
         self.noSlices = len(list(data))
+        
+        """
+        if self.fastExecution and (self.pix_size_x < 10 or self.pix_size_y < 10):
+            print("---- - Fast execution and small pixel, downsample" )
+            self.volumeSize = [int(self.maxSliceSize[0]*self.inPlaneScaling/2),
+                int(self.maxSliceSize[1]*self.inPlaneScaling/2), 
+                self.noSlices]
+            self.pix_size_x *= 2
+            self.pix_size_y *= 2 
+        else:
+        """
         self.volumeSize = [int(self.maxSliceSize[0]*self.inPlaneScaling),
             int(self.maxSliceSize[1]*self.inPlaneScaling), 
             self.noSlices]
@@ -184,6 +195,7 @@ class PathologyVolume():
             if self.verbose:
                 print("Loading slice", i)
             if not isSpacingSet:
+                ps.fastExecution = self.fastExecution
                 im = ps.loadRgbImage()
             
                 if not im:
@@ -200,6 +212,7 @@ class PathologyVolume():
                 ps.setReference(vol) 
             #print("Rotate in sl",i, ps.doRotate, self.pathologySlices[i].doRotate)
             relativeIdx = int(i>0)
+            ps.fastExecution = self.fastExecution
             vol = ps.setTransformedRgb(vol, relativeIdx)
 
 
@@ -225,6 +238,7 @@ class PathologyVolume():
         # put ps.im in vol at index ps.idx
         for i, ps in enumerate(self.pathologySlices):
             if not isSpacingSet:
+                ps.fastExecution = self.fastExecution
                 im = ps.loadMask(idxMask)
             
                 if not im:
@@ -586,6 +600,20 @@ class PathologySlice():
 
         try:
             rgbImage = sitk.ReadImage(str(self.rgbImageFn))
+            """
+            #print ("Spacing", rgbImage.GetSpacing(),self.fastExecution)
+            if self.fastExecution and rgbImage.GetSpacing()[0] < 0.01:
+                r = 2 
+                #print("---- Fast execution, downsample at loading to", rgbImage.GetSpacing()[0]*r)
+                newSize = [int(rgbImage.GetSize()[0]/r),int(rgbImage.GetSize()[1]/r)]
+                newSp = [rgbImage.GetSpacing()[0]*r,rgbImage.GetSpacing()[0]*r]
+                refRegImg = sitk.Image(newSize, sitk.sitkFloat32)
+                refRegImg.SetSpacing(newSp)
+                refRegImg.SetDirection(rgbImage.GetDirection())
+                refRegImg.SetOrigin(rgbImage.GetOrigin())
+                rgbImage = sitk.Resample(rgbImage, refRegImg, sitk.Transform())
+            """    
+                
         except Exception as e:
             print(e)
             print("Couldn't read", self.rgbImageFn)
@@ -662,6 +690,18 @@ class PathologySlice():
 
         try:
             im = sitk.ReadImage(str(maskFn))
+            """
+            if self.fastExecution and im.GetSpacing()[0] < 0.01:
+                r = 2 
+                #print("---- Fast execution, downsample mask loading to", im.GetSpacing()[0]*r)
+                newSize = [int(im.GetSize()[0]/r),int(im.GetSize()[1]/r)]
+                newSp = [im.GetSpacing()[0]*r,im.GetSpacing()[0]*r]
+                refRegImg = sitk.Image(newSize, sitk.sitkFloat32)
+                refRegImg.SetSpacing(newSp)
+                refRegImg.SetDirection(im.GetDirection())
+                refRegImg.SetOrigin(im.GetOrigin())
+                im = sitk.Resample(im, refRegImg, sitk.Transform(), sitk.sitkNearestNeighbor)
+            """
         except Exception as e:
             print(e)
             print("Couldn't read", maskFn)
