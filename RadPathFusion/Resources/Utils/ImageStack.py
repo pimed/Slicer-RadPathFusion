@@ -48,6 +48,7 @@ class PathologyVolume():
         self.doDeformable       = None
         self.doReconstruct      = None
         self.fastExecution      = None
+        self.discardOrientation = None
 
         self.successfulInitialization = False;
     
@@ -187,6 +188,7 @@ class PathologyVolume():
         if self.volumeSpacing:
             vol.SetSpacing(self.volumeSpacing)
             isSpacingSet = True
+
             
             
         # fill the volume
@@ -359,6 +361,9 @@ class PathologyVolume():
         if not self.imagingContraint and self.imagingContraintFilename:
             try:
                 self.imagingContraint  = sitk.ReadImage(self.imagingContraintFilename,sitk.sitkFloat32)
+                if self.discardOrientation:
+                    tr = [1.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 1.0]
+                    self.imagingContraint.SetDirection(tr)
             except Exception as e:
                 print(e)
         
@@ -366,6 +371,9 @@ class PathologyVolume():
         if not self.imagingContraintMask and self.imagingContraintMaskFilename:
             try:
                 self.imagingContraintMask = sitk.ReadImage(self.imagingContraintMaskFilename)
+                if self.discardOrientation:
+                    tr = [1.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 1.0]
+                    self.imagingContraintMask.SetDirection(tr)
             except Exception as e:
                 print(e)
 
@@ -429,11 +437,11 @@ class PathologyVolume():
         return imC, constraint_range
             
     def registerSlices(self, useImagingConstaint=False):
-    
+        print("Register Slices")
         
         if not useImagingConstaint:
-            if (not self.doAffine and not self.doDeformable ):
-                print("Nothing to be done as no affine and no deformable were selected")
+            if (not self.doAffine and not self.doDeformable and not self.doReconstruct ):
+                print("Nothing to be done as no reconstruction, no affine and no deformable were selected")
                 return
         print("Reconstruct?", self.doReconstruct)
         
@@ -504,7 +512,9 @@ class PathologyVolume():
             if self.fastExecution:
                 print("Fast execution: Pathology reconstruction is not performed")
                 return
+            print("Doing Reconstruction?")    
             if self.doReconstruct:
+                print("Doing Reconstruction")
                 ref = self.loadRgbVolume()
                 refMask = self.loadMask(0)
 
@@ -571,6 +581,7 @@ class PathologySlice():
         self.doAffine       = True
         self.doDeformable   = None
         self.fastExecution  = None
+        self.runLonger      = True
         
 
     def loadImageSize(self):
@@ -972,10 +983,16 @@ class PathologySlice():
             print("PathologySlice: Do no constraints affine:",self.doAffine)
             print("PathologySlice: Do no constraints deformable:",self.doDeformable)
         
-        if self.doAffine:
-            reg = RegisterImages()
-            self.transform = reg.RegisterAffine(fixed_image, moving_image, self.transform, idx, 1)
-      
+        if self.runLonger:
+            nIter = 500
+        else:
+            nIter = 250
+        
+        #if self.doAffine:
+        print(self.transform)
+        reg = RegisterImages()
+        self.transform = reg.RegisterAffine(fixed_image, moving_image, self.transform, nIter, idx, 1)
+        print(self.transform)
             
     def registerToConstrait(self, fixed_image, refMov, refMovMask, ref, refMask, idx, applyTranf = True):  
         if applyTranf:
@@ -1064,24 +1081,33 @@ class PathologySlice():
             refRegImg.SetDirection(fixed_image.GetDirection())
             refRegImg.SetOrigin(fixed_image.GetOrigin())
             fixed_image = sitk.Resample(fixed_image, refRegImg, sitk.Transform())
- 
+
+        if self.runLonger:
+            nIter = 500
+        else:
+            nIter = 250
+            
         if self.doAffine:
             fixed_image_input = sitk.Cast(fixed_image>0, sitk.sitkFloat32)*255
             moving_image_input = sitk.Cast(moving_image>0, sitk.sitkFloat32)*255
             
             #time1 = time.time()
-            self.transform = reg.RegisterAffine(fixed_image_input, moving_image_input, self.transform, idx, 1, 0, True, False)
+            self.transform = reg.RegisterAffine(fixed_image_input, moving_image_input, self.transform, nIter, idx, 1, 0, True, False)
             #time2 = time.time()
-            self.transform = reg.RegisterAffine(fixed_image_input, moving_image_input, self.transform, idx, 1, 0, True, False)
+            self.transform = reg.RegisterAffine(fixed_image_input, moving_image_input, self.transform, nIter, idx, 1, 0, True, False)
             #time3 = time.time()
-            self.transform = reg.RegisterAffine(fixed_image_input, moving_image_input, self.transform, idx, 0, 0, True, False)
+            self.transform = reg.RegisterAffine(fixed_image_input, moving_image_input, self.transform, nIter, idx, 0, 0, True, False)
             #time4 = time.time()
 
 
-        
+        if self.runLonger:
+            nIter = 50
+        else:
+            nIter = 10
+            
         #time5 = time.time()
         if self.doDeformable:
-            transform_def = reg.RegisterDeformable(fixed_image, moving_image, self.transform, 10, idx)
+            transform_def = reg.RegisterDeformable(fixed_image, moving_image, self.transform, 10, nIter, idx)
             self.transform.AddTransform(transform_def)
             
         #end_time = time.time()

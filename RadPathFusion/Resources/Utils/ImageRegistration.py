@@ -112,7 +112,7 @@ class RegisterImages():
         global metric_values, multires_iterations
         multires_iterations.append(len(metric_values))   
             
-    def RegisterAffine(self, fixed_img, moving_img, initial_transf, idx = 0, 
+    def RegisterAffine(self, fixed_img, moving_img, initial_transf, nIterations = 250, idx = 0, 
         mode = 0, mode_score=0, apply_tr=False, debug=False):
         if debug:
             import time
@@ -159,16 +159,25 @@ class RegisterImages():
 
 
         # Optimizer settings.
-        nIterations = 250
+
         convergenceWindowSize = 50
         
         registration_method.SetOptimizerAsGradientDescent(learningRate=0.01, #changed learning rate from 0.1 to 0.01
             numberOfIterations=nIterations, convergenceMinimumValue=1e-4, convergenceWindowSize=convergenceWindowSize)
         #registration_method.SetOptimizerScalesFromPhysicalShift()
         if mode==0: #affine + mse
+            # parameters that work for the general whole mount cases; 
+            # they are a bit conservative but prevent over stratching or over rotation
             registration_method.SetOptimizerScales([2000,2000,2000,2000,1,1])
+            
+            #some of the pseudo howl moutn are a bit to stretch out so the 
+            #scaling needs to be relaxed a bit to prevent deformable registration over fitting
+            #only used on cases aaa0054 and aaa072 for the TCIA cohort
+            #registration_method.SetOptimizerScales([100,2000,2000,100,1,1])
+            
         elif mode==1: # do rigid + mse
             registration_method.SetOptimizerScales([2000,1,1])
+            #registration_method.SetOptimizerScales([10,1,1])
         else: # affine+mi
             registration_method.SetOptimizerScales([100,100,100,100,1,1])
             
@@ -221,7 +230,7 @@ class RegisterImages():
             return final_transform
 
 
-    def RegisterDeformable(self, fixed_img, moving_img, initial_transf, dist_between_grid_points = 10, idx = 0, debug=False):
+    def RegisterDeformable(self, fixed_img, moving_img, initial_transf, dist_between_grid_points = 10,  nIterations = 10, idx = 0, debug=False):
         """
             dist_between_grid_points is in mm. 
         """
@@ -255,9 +264,6 @@ class RegisterImages():
 
         registration_method.SetInterpolator(sitk.sitkLinear)
 
-
-        
-        nIterations = 10
 
         # Optimizer settings.
         registration_method.SetOptimizerAsLBFGSB(gradientConvergenceTolerance=1e-5, numberOfIterations=nIterations)
