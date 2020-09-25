@@ -81,6 +81,8 @@ class PathologyVolume():
 
         self.pathologySlices = []
         self.regionIDs = []
+
+        print(np.sort(list(self.jsonDict)))
         for key in np.sort(list(self.jsonDict)):
             ps            = PathologySlice()
             ps.jsonKey    = key
@@ -362,6 +364,8 @@ class PathologyVolume():
             try:
                 self.imagingContraint  = sitk.ReadImage(self.imagingContraintFilename,sitk.sitkFloat32)
                 if self.discardOrientation:
+                    if self.verbose:
+                        print("Discarding Orientation")
                     tr = [1.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 1.0]
                     self.imagingContraint.SetDirection(tr)
             except Exception as e:
@@ -581,7 +585,7 @@ class PathologySlice():
         self.doAffine       = True
         self.doDeformable   = None
         self.fastExecution  = None
-        self.runLonger      = True
+        self.runLonger      = False
         
 
     def loadImageSize(self):
@@ -989,10 +993,10 @@ class PathologySlice():
             nIter = 250
         
         #if self.doAffine:
-        print(self.transform)
+        #print(self.transform)
         reg = RegisterImages()
         self.transform = reg.RegisterAffine(fixed_image, moving_image, self.transform, nIter, idx, 1)
-        print(self.transform)
+        #print(self.transform)
             
     def registerToConstrait(self, fixed_image, refMov, refMovMask, ref, refMask, idx, applyTranf = True):  
         if applyTranf:
