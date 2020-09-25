@@ -1,0 +1,77 @@
+{
+    "slice1": {
+        "dpi_x": 2539.748657780495,
+        "dpi_y": 2539.748657780495,
+        "filename": "Histopathology\\aaa0060\\images\\aaa0060 C1C2C3C4.tiff",
+        "id": "aaa0060 C1C2C3C4",
+        "magnification": 2.4997526159256838,
+        "regions": {
+            "region00": {
+                "filename": "Histopathology\\aaa0060\\annotations\\aaa0060 C1C2C3C4_annotation_01_R000G255B255.tiff",
+                "id": "16776960",
+                "note": "Annotation 0"
+            },
+            "region01": {
+                "filename": "Histopathology\\aaa0060\\annotations\\aaa0060 C1C2C3C4_annotation_00_R000G255B000_regions.tiff",
+                "id": "65280",
+                "note": "CAP:"
+            }
+        },
+        "resolution_x_um": 7.200712536642118,
+        "resolution_y_um": 7.200712536642118,
+        "transform": {
+            "flip": 1,
+            "rotation_angle": 0
+        }
+    },
+    "slice2": {
+        "dpi_x": 2539.836350750596,
+        "dpi_y": 2539.836350750596,
+        "filename": "Histopathology\\aaa0060\\images\\aaa0060 D1D2D3D4.tiff",
+        "id": "aaa0060 D1D2D3D4",
+        "magnification": 2.4998389279041295,
+        "regions": {
+            "region00": {
+                "filename": "Histopathology\\aaa0060\\annotations\\aaa0060 D1D2D3D4_annotation_01_R000G255B255.tiff",
+                "id": "16776960",
+                "note": "Annotation 0"
+            },
+            "region01": {
+                "filename": "Histopathology\\aaa0060\\annotations\\aaa0060 D1D2D3D4_annotation_00_R000G255B000_regions.tiff",
+                "id": "65280",
+                "note": "CAP:"
+            }
+        },
+        "resolution_x_um": 7.2004639175257745,
+        "resolution_y_um": 7.2004639175257745,
+        "transform": {
+            "flip": 1,
+            "rotation_angle": -5
+        }
+    },
+    "slice3": {
+        "dpi_x": 2539.8834702023214,
+        "dpi_y": 2539.8834702023214,
+        "filename": "Histopathology\\aaa0060\\images\\aaa0060 E1E2E3E4.tiff",
+        "id": "aaa0060 E1E2E3E4",
+        "magnification": 2.499885305317245,
+        "regions": {
+            "region00": {
+                "filename": "Histopathology\\aaa0060\\annotations\\aaa0060 E1E2E3E4_annotation_01_R000G255B255.tiff",
+                "id": "16776960",
+                "note": "Annotation 0"
+            },
+            "region01": {
+                "filename": "Histopathology\\aaa0060\\annotations\\aaa0060 E1E2E3E4_annotation_00_R000G255B000_regions.tiff",
+                "id": "65280",
+                "note": "CAP:"
+            }
+        },
+        "resolution_x_um": 7.200330335841439,
+        "resolution_y_um": 7.200330335841439,
+        "transform": {
+            "flip": 1,
+            "rotation_angle": -17
+        }
+    }
+}

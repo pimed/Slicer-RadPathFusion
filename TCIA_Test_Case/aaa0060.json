@@ -1,0 +1,15 @@
+{
+	"id":"aaa0060",
+	"invivo-accession": "",
+	"fixed":"MRI\\aaa0060-20000429-PELVIS^PROSTATE-4-T2_AXIAL_SM_FOV.mha",
+	"exvivo-accession": "",
+	"fixed-segmentation":"MRI\\aaa0060-20000429-PELVIS^PROSTATE-4-T2_AXIAL_SM_FOV-prostate_label.nii.gz",
+	"fixed-landmarks2":"",
+	"fixed-landmarks3":"",
+	"fixed-landmarks1":"",
+	"moving-type":"stack",
+	"moving":"Histopathology\\aaa0060.json",
+	"T2w": "",
+	"ADC": "",
+	"DWI": ""
+}

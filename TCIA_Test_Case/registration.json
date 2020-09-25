@@ -1,0 +1,23 @@
+{
+  "version":"0.1",
+  "type": "registration",
+  "method":
+  {
+	"type":"3DRegistration",
+	"do_affine":true, 
+	"do_deformable":true,
+    "fast_execution":false,
+    "do_reconstruction":true,
+    "use_imaging_constraints":true
+  },
+  "output_path":"results",
+  "studies2process": 
+  { 
+  
+	"aaa0060":"aaa0060.json"
+  },
+  "studies": 
+  {
+	"aaa0060":"aaa0060.json"
+	}
+}
