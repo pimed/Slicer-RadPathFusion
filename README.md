@@ -21,6 +21,19 @@ Contains the Slicer Extension for radiology pathology fusion
 1. Open Slicer
 2. Modules > Radiology-Pathology Fusion
 
+# How to run/test using command line
+
+```
+cd Path_To_Slicer-RadPathFusion/TCIA_Test_Case
+python ..\CmdLineTools\test_run_registration.py -i registration.json
+```
+Notes:
+* Script tested on Windows, proceed with care on Linux or Mac (biggest issues is associated with paths, so if it can't find the files, is because the paths in the json files don't work on our OS)
+* Registration assumes slice-to-slice correspondances between radiology and pathology images. First slice in the MRI prostate segmentation corresponds to slice01 in histopathology json file. And so on so forth. 
+* Registration is a slow process, be patient!
+* Registration overfits easily, often because of masks not matching well! If it happens, check the masks on both radiology and pathology images and update them to match better
+
+
 
 # To do
 
