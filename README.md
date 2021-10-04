@@ -16,6 +16,11 @@ Contains the Slicer Extension for radiology pathology fusion
 3. Choose path to Slicer-RadPathFusion / RadPathFusion
 4. Choose Ok, Yes (Note! This will restart slicer)
 
+
+# Video tutorial
+
+A short tutorial on how to run the registration can be found here: [https://youtu.be/B2o8EMmRsHw]
+
 # How to use
 
 1. Open Slicer 
