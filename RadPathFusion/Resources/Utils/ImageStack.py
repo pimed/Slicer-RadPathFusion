@@ -227,6 +227,9 @@ class PathologyVolume():
             return vol
             
     def loadMask(self, idxMask=0):
+        """
+        Load all the masks from a certain region
+        """
         # create new volume with 
         vol = sitk.Image(self.volumeSize, sitk.sitkUInt8)
         if self.volumeOrigin:
@@ -668,9 +671,14 @@ class PathologySlice():
             
     def getGrayFromRGB(self, im, invert=True):
         select  = sitk.VectorIndexSelectionCastImageFilter()
-        im_gray = select.Execute(im, 0, sitk.sitkUInt8)/3
-        im_gray +=select.Execute(im, 1, sitk.sitkUInt8)/3
-        im_gray +=select.Execute(im, 2, sitk.sitkUInt8)/3
+        select.SetIndex(0)
+        im_gray = select.Execute(im)/3
+        
+        select.SetIndex(1)
+        im_gray +=select.Execute(im)/3
+        
+        select.SetIndex(2)
+        im_gray +=select.Execute(im)/3
        
         if invert:
             im_gray  = 255 - im_gray
@@ -766,23 +774,55 @@ class PathologySlice():
         #get first channel, needed for input of CenteredTransform
         if not mode:
             select = sitk.VectorIndexSelectionCastImageFilter()
-            im0  = select.Execute(im, 0, sitk.sitkUInt8)/3
-            im0  += select.Execute(im, 1, sitk.sitkUInt8)/3
-            im0  += select.Execute(im, 2, sitk.sitkUInt8)/3
+            #updated code for new syntax
+            select.SetIndex(0)
+            im0  = select.Execute(im)/3
+            select.SetIndex(1)
+            im0  += select.Execute(im)/3
+            select.SetIndex(2)
+            im0  += select.Execute(im)/3
+            
+            #im0  = select.Execute(im, 0, sitk.sitkUInt8)/3
+            #im0  += select.Execute(im, 1, sitk.sitkUInt8)/3
+            #im0  += select.Execute(im, 2, sitk.sitkUInt8)/3
             
             # since rgb also invert the intensities
             im0 = 255-im0
             
             # if there are more slices in the exvivo than invivo
+            
             try: 
-                ref0 = select.Execute(ref[:,:,self.refSliceIdx-relativeIdx], 0, sitk.sitkUInt8)/3
-                ref0 += select.Execute(ref[:,:,self.refSliceIdx-relativeIdx], 1, sitk.sitkUInt8)/3
-                ref0 += select.Execute(ref[:,:,self.refSliceIdx-relativeIdx], 2, sitk.sitkUInt8)/3
+                select.SetIndex(0)
+                ref0 = select.Execute(ref[:,:,self.refSliceIdx-relativeIdx])/3
+                select.SetIndex(1)
+                ref0 = select.Execute(ref[:,:,self.refSliceIdx-relativeIdx])/3
+                select.SetIndex(2)
+                ref0 = select.Execute(ref[:,:,self.refSliceIdx-relativeIdx])/3
+                
+                
+                
             except Exception as e:
                 print (e)
-                ref0 = select.Execute(ref[:,:,self.refSliceIdx-1], 0, sitk.sitkUInt8)/3
-                ref0 += select.Execute(ref[:,:,self.refSliceIdx-1], 1, sitk.sitkUInt8)/3
-                ref0 += select.Execute(ref[:,:,self.refSliceIdx-1], 2, sitk.sitkUInt8)/3
+                select.SetIndex(0)
+                ref0 = select.Execute(ref[:,:,self.refSliceIdx-1])/3
+                
+                select.SetIndex(1)
+                ref0 = select.Execute(ref[:,:,self.refSliceIdx-1])/3
+                
+                select.SetIndex(2)
+                ref0 = select.Execute(ref[:,:,self.refSliceIdx-1])/3
+                
+                #ref0 = sitk.Cast(ref0,sitk.sitkUInt8)
+
+            #try: 
+            #    ref0 = select.Execute(ref[:,:,self.refSliceIdx-relativeIdx], 0, sitk.sitkUInt8)/3
+            #    ref0 += select.Execute(ref[:,:,self.refSliceIdx-relativeIdx], 1, sitk.sitkUInt8)/3
+            #   ref0 += select.Execute(ref[:,:,self.refSliceIdx-relativeIdx], 2, sitk.sitkUInt8)/3
+            #except Exception as e:
+            #    print (e)
+            #    ref0 = select.Execute(ref[:,:,self.refSliceIdx-1], 0, sitk.sitkUInt8)/3
+            #    ref0 += select.Execute(ref[:,:,self.refSliceIdx-1], 1, sitk.sitkUInt8)/3
+            #    ref0 += select.Execute(ref[:,:,self.refSliceIdx-1], 2, sitk.sitkUInt8)/3
             
             ref0 = 255-ref0            
         else:
@@ -857,7 +897,9 @@ class PathologySlice():
             transform = sitk.AffineTransform(tr)     
 
         if self.transform:
-            self.transform.AddTransform(transform)
+            #self.transform.AddTransform(transform)
+            self.transform = sitk.CompositeTransform([self.transform, transform])
+            
         else:
             self.transform = sitk.Transform(transform)
             
@@ -901,6 +943,8 @@ class PathologySlice():
         return ref 
 
     def setTransformedMask(self, ref, idxMask, relativeIdx):
+    
+        
         im = self.loadMask(idxMask)
         
         #nothing was read
@@ -926,7 +970,7 @@ class PathologySlice():
             ref_tr = sitk.JoinSeries(im_tr)
             ref    = sitk.Paste(ref, ref_tr, ref_tr.GetSize(), 
                 destinationIndex=[0,0,self.refSliceIdx])
-
+                
         return ref 
  
     def registerTo(self, refPs, ref, refMask, applyTranf2Ref = True, idx = 0):
@@ -1111,6 +1155,9 @@ class PathologySlice():
             
         #time5 = time.time()
         if self.doDeformable:
+            #print(fixed_image.GetSize(), fixed_image.GetSpacing())
+            #print(moving_image.GetSize(), moving_image.GetSpacing())
+            #print(self.transform)
             transform_def = reg.RegisterDeformable(fixed_image, moving_image, self.transform, 10, nIter, idx)
             self.transform.AddTransform(transform_def)
             

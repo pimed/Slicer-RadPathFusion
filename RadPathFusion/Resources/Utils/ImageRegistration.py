@@ -114,6 +114,7 @@ class RegisterImages():
             
     def RegisterAffine(self, fixed_img, moving_img, initial_transf, nIterations = 250, idx = 0, 
         mode = 0, mode_score=0, apply_tr=False, debug=False):
+        
         if debug:
             import time
             start_time = time.time()
@@ -125,10 +126,29 @@ class RegisterImages():
             print("mode_Tra:", mode, "\nMode_score", mode_score, "\nApply Transofrm", apply_tr)
         
         if not apply_tr:
+        
+            all_transf = []
+            try: 
+                n = initial_transf.GetNumberOfTransforms()
+                for i in range(n):
+                    
+                    tr = initial_transf.GetNthTransform(i)
+                    all_transf.append(tr)
+            except Exception as e:
+                #print(e)
+                all_transf.append(initial_transf)
+            
             if mode==1: # do rigid
-                initial_transf.AddTransform(sitk.Euler2DTransform())    
+                all_transf.append(sitk.Euler2DTransform())
+                #initial_transf =  sitk.CompositeTransform([initial_transf, sitk.Euler2DTransform()])
+                
             else:
-                initial_transf.AddTransform(sitk.AffineTransform(2))    
+                all_transf.append(sitk.AffineTransform(2))
+                #initial_transf =  sitk.CompositeTransform([initial_transf, sitk.AffineTransform(2)])
+                
+            initial_transf =  sitk.CompositeTransform(all_transf)
+                
+            
         else:
             moving_img = sitk.Resample(moving_img, fixed_img,
                 initial_transf, sitk.sitkLinear, 0.0, fixed_img.GetPixelID())
@@ -186,7 +206,7 @@ class RegisterImages():
         registration_method.SetShrinkFactorsPerLevel(shrinkFactors = [16,8,4])
         registration_method.SetSmoothingSigmasPerLevel(smoothingSigmas=[4,2,1])
         registration_method.SmoothingSigmasAreSpecifiedInPhysicalUnitsOff()
-
+        
         # Don't optimize in-place, we would possibly like to run this cell multiple times.
         registration_method.SetInitialTransform(initial_transf, inPlace=False)
         
