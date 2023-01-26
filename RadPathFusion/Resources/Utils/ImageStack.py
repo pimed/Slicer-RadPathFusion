@@ -1089,7 +1089,24 @@ class PathologySlice():
         # if affine and deformable are not done, then just center. 
         #if not self.doAffine and not self.doDeformable:
         # center by COM
-        self.transform.AddTransform(transform)
+        
+        # create list of all transforms 
+        all_transf = []
+        try: 
+            n = self.transform.GetNumberOfTransforms()
+            for i in range(n):
+                tr = self.transform.GetNthTransform(i)
+                all_transf.append(tr)
+        except Exception as e:
+            #print(e)
+            all_transf.append(self.transform)
+        
+        all_transf.append(transform)
+           
+            
+        self.transform =  sitk.CompositeTransform(all_transf)
+        
+        #self.transform.AddTransform(transform)
             
         
         if self.verbose:
