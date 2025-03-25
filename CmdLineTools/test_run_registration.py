@@ -1,8 +1,30 @@
+import os
+import sys
+
+# Get the directory of the current script
+current_dir = os.path.dirname(os.path.abspath(__file__))
+
+# Construct the path to the local library (assuming it's in a subdirectory called "mylibrary")
+library_path = os.path.join(current_dir, '..', "RadPathFusion","Resources","Utils")
+
+# Add the library path to sys.path if it exists
+if os.path.exists(library_path):
+    sys.path.append(library_path)
+    # Now you can import modules from 'mylibrary'
+    from ImageStack import PathologyVolume
+    # Use functions or classes from mymodule
+    #mymodule.my_function()
+else:
+    print(f"Error: Library not found at {library_path}")
+    
+    
+    
+
 from parse_registration_json import ParserRegistrationJson
 from parse_study_dict import ParserStudyDict
-from ImageStack import PathologyVolume
+
 import argparse
-import os
+
 import time
 import SimpleITK as sitk
 
