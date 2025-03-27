@@ -1,19 +1,15 @@
 import os
 import sys
+import json
 
 # Get the directory of the current script
 current_dir = os.path.dirname(os.path.abspath(__file__))
 
 # Construct the path to the local library (assuming it's in a subdirectory called "mylibrary")
 library_path = os.path.join(current_dir, '..', "RadPathFusion","Resources","Utils")
-
-# Add the library path to sys.path if it exists
 if os.path.exists(library_path):
     sys.path.append(library_path)
-    # Now you can import modules from 'mylibrary'
     from ImageStack import PathologyVolume
-    # Use functions or classes from mymodule
-    #mymodule.my_function()
 else:
     print(f"Error: Library not found at {library_path}")
     
@@ -46,6 +42,27 @@ def output_results(path, studyParser, inputStack, imStack,
         print (e)
     else:
         print ("Successfully created the directory %s " % path)
+    
+    #### save the transforms    
+    json_transf = {}
+    for ps in imStack.pathologySlices:
+        slice_key = ps.jsonKey 
+        fn = os.path.join(path, studyParser.id+"_transform_"+slice_key+".tfm")
+        tr = ps.transform
+        tr.FlattenTransform()
+        #print(fn, ps.transform)
+        sitk.WriteTransform(ps.transform, fn)
+        json_transf[slice_key] = {"transform_fn":fn}
+    
+    big_json = { "transforms": json_transf, 
+        "fixed": os.path.join(path,studyParser.id+"_fixed_image."+extension), 
+        "fixed-segmentation": os.path.join(path,studyParser.id+"_fixed_mask_label."+extension)  }
+       
+    json_transf_fn = os.path.join(path, studyParser.id+"_transform.json")
+    with open(json_transf_fn, 'w') as outfile:
+        json.dump(big_json, outfile, indent=4, sort_keys=True)
+    return
+    
 
     output_path = os.path.join(path,str(studyParser.id))
     if not debug:
@@ -148,7 +165,7 @@ def output_results(path, studyParser, inputStack, imStack,
                 rIds.append(r)
                 nr.append(i)
 
-    print("Run Registratino: Debug", debug, nr)
+    print("Run Registration: Debug", debug, nr)
     
     
     for i,id in enumerate(nr):
@@ -196,6 +213,7 @@ def output_results(path, studyParser, inputStack, imStack,
             inMsk = inputStack.loadMask(i)
             fn = os.path.join(path,"{:s}_input_highres_{:s}_label.{:s}".format(studyParser.id, rIds[i],extension))
             sitk.WriteImage(inMsk, fn)
+    
 
 
 def register(fixed_fn, fixed_mask_fn, moving_fn, doReconstruct = True,
@@ -242,6 +260,7 @@ def register(fixed_fn, fixed_mask_fn, moving_fn, doReconstruct = True,
     
     if useImagingConstraints:
         im_stack.registerSlices(useImagingConstraints)
+        
         
     return im_stack
 
@@ -323,7 +342,7 @@ def main():
     
     if verbose:
         print("Reading", opt.in_path)
-    
+            
     json_obj = ParserRegistrationJson(opt.in_path)
     
     for s in json_obj.studies:

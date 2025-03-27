@@ -26,6 +26,7 @@ class PathologyVolume():
         self.inPlaneScaling     = 1.2
          
         self.pathologySlices    = None
+        
         self.jsonDict           = None
         
         #filenames if needed to load here
@@ -88,13 +89,28 @@ class PathologyVolume():
             ps.jsonKey    = key
             ps.rgbImageFn = data[key]['filename']
             ps.maskDict   = data[key]['regions']
-            try: # new format
+            ps.id         = data[key]['id']
+            
+            ps.doFlip = None
+            ps.doRotate = None
+            print(data[key]['transform'], )
+            if 'transform' in data[key]: # new format
                 ps.transformDict = data[key]['transform']
-                ps.doFlip     = ps.transformDict['flip']
-                ps.doRotate   = ps.transformDict['rotation_angle']
-            except: #old format
-                ps.doFlip     = int(data[key]['flip']) 
-                ps.doRotate   = data[key].get('rotate',None)
+                if 'flip' in ps.transformDict:
+                    ps.doFlip     = ps.transformDict['flip']
+                if 'rotation_angle' in data[key]['transform']:
+                    ps.doRotate   = ps.transformDict['rotation_angle']
+            else:
+                if 'flip' in data[key]:
+                    ps.doFlip     = int(data[key]['flip']) 
+                if 'rotate' in data[key]:
+                    ps.doRotate   = data[key].get('rotate',None)
+                    
+            #if flip and rotate were not found at all, then just set them to 0, aka do nothing
+            if ps.doFlip == None: 
+                print("Setting default parameters")
+                ps.doFlip = 0
+                ps.doRotate = 0
                 
             ps.loadImageSize()
             size = ps.rgbImageSize
@@ -124,16 +140,23 @@ class PathologyVolume():
   
   
             xml_res_x = None
-            try: #new xml format
+            
+            if 'resolution_x_um' in data[key]:
                 xml_res_x = float(data[key]['resolution_x_um'])
-            except: #old xml format
-                xml_res_x = float(data[key]['resolution_x'])
-                
-            xml_res_y = None                
-            try: #new xml format
+            if 'resolution_x' in data[key]:
+                xml_res_x = float(data[key]['resolution_x'])                   
+            if xml_res_x == None:
+                xml_res_x = 0
+
+            xml_res_y = None
+                    
+            if 'resolution_y_um' in data[key]:
                 xml_res_y = float(data[key]['resolution_y_um'])
-            except: #old xml format
-                xml_res_y = float(data[key]['resolution_y'])
+            if 'resolution_y' in data[key]:
+                xml_res_y = float(data[key]['resolution_y'])                   
+            if  xml_res_y == None:
+                xml_res_y = 0
+
 
             if self.pix_size_x==0 and xml_res_x>0:
                 self.pix_size_x = xml_res_x
@@ -225,6 +248,48 @@ class PathologyVolume():
             return self.rgbVolume
         else:
             return vol
+
+    def applyTransformsOntoConstraint(self, trs):
+        imC,constraint_Range = self.getConstraint()
+        
+        #sitk.WriteImage(imC, "moving3d.mha")
+        
+        # create new volume with 
+        vol = sitk.Image(imC.GetSize(), sitk.sitkVectorUInt8, 3)
+        vol.SetOrigin(imC.GetOrigin())
+        vol.SetDirection(imC.GetDirection())          
+        vol.SetSpacing(imC.GetSpacing())
+        
+        for i, ps in enumerate(self.pathologySlices):
+            tr = ps.transform
+            ps.setReference(vol)
+            ps.transform = trs[i]
+            relativeIdx = int(i>0)
+            ps.doRotate = 0
+            vol = ps.setTransformedRgb(vol,relativeIdx)
+        
+        return vol
+
+    def applyTransformsOntoConstraintMask(self, idxMask, trs):
+        imC,constraint_Range = self.getConstraint()
+        
+        #sitk.WriteImage(imC, "moving3d.mha")
+        
+        # create new volume with 
+        vol = sitk.Image(imC.GetSize(), sitk.sitkUInt8)
+        vol.SetOrigin(imC.GetOrigin())
+        vol.SetDirection(imC.GetDirection())          
+        vol.SetSpacing(imC.GetSpacing())
+        
+        for i, ps in enumerate(self.pathologySlices):
+            tr = ps.transform
+            ps.setReference(vol)
+            ps.transform = trs[i]
+            relativeIdx = int(i>0)
+            ps.doRotate = 0
+            vol = ps.setTransformedMask(vol, idxMask, relativeIdx)
+        
+        return vol
             
     def loadMask(self, idxMask=0):
         """
@@ -359,12 +424,14 @@ class PathologyVolume():
         
         with open(path_out_json, 'w') as outfile:
             json.dump(self.jsonDict, outfile, indent=4, sort_keys=True)
+            
 
     def getConstraint(self):
     
         # if we have a filename but not volume
         if not self.imagingContraint and self.imagingContraintFilename:
             try:
+                print("Reading the fixed image")
                 self.imagingContraint  = sitk.ReadImage(self.imagingContraintFilename,sitk.sitkFloat32)
                 if self.discardOrientation:
                     if self.verbose:
@@ -514,6 +581,9 @@ class PathologyVolume():
                     movPs.registerToConstrait(imC[:,:,ifix], self.refWoContraints,self.mskRefWoContraints, ref, refMask, ifix)
                 end_reg_time = time.time()
                 print("Done registration in ", (end_reg_time-start_reg_time)/60, "min")
+                #final_transform = movPs.transform
+                #print(final_transform)
+                
         else:
         
             if self.fastExecution:
@@ -550,6 +620,8 @@ class PathologyVolume():
                     movPs = self.pathologySlices[imov]
                     movPs.doAffine      = self.doAffine
                     movPs.registerTo(fixPs, ref, refMask, True, 10+imov)
+                    #final_transform = movPs.transform
+                    #print(final_transform)
 
                 
     def deleteData(self):
