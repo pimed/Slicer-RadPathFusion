@@ -61,7 +61,6 @@ def output_results(path, studyParser, inputStack, imStack,
     json_transf_fn = os.path.join(path, studyParser.id+"_transform.json")
     with open(json_transf_fn, 'w') as outfile:
         json.dump(big_json, outfile, indent=4, sort_keys=True)
-    return
     
 
     output_path = os.path.join(path,str(studyParser.id))
