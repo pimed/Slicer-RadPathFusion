@@ -194,7 +194,7 @@ def output_results(path, studyParser, inputStack, imStack,
     fn = os.path.join(path,studyParser.id+"_moved_highres_rgb."+extension)
     sitk.WriteImage(moved, fn)
     
-    if not debug:
+    if debug:
         #write rgb high-res
         inIm = inputStack.loadRgbVolume()
         inIm = sitk.Cast(inIm, sitk.sitkVectorUInt8)
@@ -380,6 +380,7 @@ def main():
             print("Registration done in {:6.3f}(min)".format((end-start)/60.0))
             
             timings[s] = (end-start)/60.0
+            os.makedirs(json_obj.output_path, exist_ok = True)
             output_path = os.path.join(json_obj.output_path,str(studyParser.id))
             output_results(output_path, studyParser,
                 getInputStack(studyParser.moving_filename),  imStack,
